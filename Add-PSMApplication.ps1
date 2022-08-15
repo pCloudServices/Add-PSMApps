@@ -711,7 +711,6 @@ if ($MmcAppsTest) {
         }
     }
     Expand-Archive -Path "$CurrentDirectory\Supplemental\GenericMmc\MscFiles.zip" -DestinationPath "C:\PSMApps\" -Force
-    break # Only install MMC dispatcher once.
     $Components = @()
     $WindowsFeatures = @()
     switch ($Application) {
@@ -790,8 +789,7 @@ if ($MmcAppsTest) {
                 -ComponentName ("PSM-" + $Component.Name) `
                 -ComponentDisplayName $Component.DisplayName `
                 -MSCPath ("C:\PSMApps\" + $Component.MscFile) `
-                -SupportGPMC:$Component.GPMC `
-                -HTML5 $HTML5
+                -SupportGPMC:$Component.GPMC
             $result = Import-PSMConnectionComponent -Input_File $TargetComponentZipFile -pvwaAddress $pvwaAddress -pvwaToken $pvwaToken -ComponentName $Component.Name
             if ($result) {
                 Write-LogMessage -type Verbose "Successfully imported connection component"
@@ -819,15 +817,15 @@ switch ($Application) {
             exit 1
         }
         if ($tinaCreds) {
-        $ComponentZipFile = "$CurrentDirectory\Supplemental\GenericMmc\ConnectionComponent.zip"
-        $TargetComponentZipFile = $env:temp + "\CC-" + (Get-Date -UFormat '%Y%m%d%H%M%S') + ".zip"
-        Set-GenericMmcConnectionComponent -PSMInstallationFolder $PSMInstallationFolder `
-            -ComponentZipFile $ComponentZipFile `
-            -TargetComponentZipFile $TargetComponentZipFile `
-            -ComponentName $ComponentName `
-            -ComponentDisplayName $ComponentDisplayName `
-            -MSCPath $MSCPath `
-            -SupportGPMC:$SupportGPMC
+            $ComponentZipFile = "$CurrentDirectory\Supplemental\GenericMmc\ConnectionComponent.zip"
+            $TargetComponentZipFile = $env:temp + "\CC-" + (Get-Date -UFormat '%Y%m%d%H%M%S') + ".zip"
+            Set-GenericMmcConnectionComponent -PSMInstallationFolder $PSMInstallationFolder `
+                -ComponentZipFile $ComponentZipFile `
+                -TargetComponentZipFile $TargetComponentZipFile `
+                -ComponentName $ComponentName `
+                -ComponentDisplayName $ComponentDisplayName `
+                -MSCPath $MSCPath `
+                -SupportGPMC:$SupportGPMC
             $result = Import-PSMConnectionComponent -ComponentName $ComponentName -Input_File $TargetComponentZipFile -pvwaAddress $pvwaAddress -pvwaToken $pvwaToken
             if ($result) {
                 Write-LogMessage -type Verbose "Successfully imported connection component"
