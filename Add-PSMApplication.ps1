@@ -1,13 +1,9 @@
 [CmdletBinding()]
 param (
     [Parameter(Mandatory = $true)]
-    [ValidateSet("GoogleChromeX86", "GoogleChromeX64", "SqlMgmtStudio18", "ADTools", "GenericMMC", "TOTPToken")]
-    [string]
-    $Application,
-    [Parameter(Mandatory = $false)]
-    [ValidateSet("ADUC", "DNS", "DHCP", "ADDT", "ADSS", "GPMC", "All")]
+    [ValidateSet("GoogleChromeX86", "GoogleChromeX64", "SqlMgmtStudio18", "GenericMMC", "TOTPToken", "ADUC", "DNS", "DHCP", "ADDT", "ADSS", "GPMC")]
     [string[]]
-    $ADTools,
+    $Application,
     [Parameter(Mandatory = $false)]
     [string]
     $MSCPath,
@@ -20,7 +16,6 @@ param (
     [Parameter(Mandatory = $false)]
     [switch]
     $SupportGPMC
-
 )
 
 Function Add-PSMConfigureAppLockerSection {
@@ -654,160 +649,165 @@ $pvwaAddress = Get-PvwaAddress -psmRootInstallLocation $PSMInstallationFolder
 
 $Tasks = @()
 
-# Modify the XML
-switch ($Application) {
-    # Active Directory Management Tools
-    "ADTools" {
-        If (!($ADTools)) {
-            Write-LogMessage -type Info -MSG "To install Active Directory Tools, please provide a comma-separated list of tools to install with the -ADTools parameter, or `"All`" to install all available tools. Available options:"
-            Write-LogMessage -type Info -MSG "  All  - All of the below"
-            Write-LogMessage -type Info -MSG "  ADUC - Active Directory Users and Computers"
-            Write-LogMessage -type Info -MSG "  ADDT - Active Directory Domains and Trusts"
-            Write-LogMessage -type Info -MSG "  ADSS - Active Directory Sites and Services"
-            Write-LogMessage -type Info -MSG "  GPMC - Group Policy Management Console"
-            Write-LogMessage -type Info -MSG "  DNS  - DNS Management Console"
-            Write-LogMessage -type Info -MSG "  DHCP - DHCP Management Console"
-            Write-LogMessage -type Info -MSG "Example: .\Add-PSMApplication.ps1 -Application ADTools -ADTools ADUC,GPMC,DNS"
-            Write-LogMessage -type Error -MSG "No list of components to install provided. Exiting."
-            exit 1
-        }
-        $ADTools
-        $Components = @()
-        $WindowsFeatures = @()
-        switch ($ADTools) {
-            { $PSItem -in "ADSS", "ADDT", "ADUC", "All" } {
-                $WindowsFeatures += "RSAT-ADDS-Tools"
-                switch ($PSItem) {
-                    "ADUC" {
-                        $Components += @{
-                            Name        = "ADUC"
-                            DisplayName = "AD Users & Computers"
-                            MscFile     = "ADUC.msc"
-                        }
-                    }
-                    "ADDT" {
-                        $Components += @{
-                            Name        = "ADDT"
-                            DisplayName = "AD Domains & Trusts"
-                            MscFile     = "ADDT.msc"
-                        }
-                    }
-                    "ADSS" {
-                        $Components += @{
-                            Name        = "ADSS"  
-                            DisplayName = "AD Sites & Services"     
-                            MscFile     = "ADSS.msc"
-                        }
-                    }
-                }
-            }
-            { $PSItem -eq "DHCP" -or $PSItem -eq "All" } {
-                Write-Verbose "DHCP"
-                $WindowsFeatures += "RSAT-DHCP"
-                $Components += @{
-                    Name        = "DHCPMGMT"
-                    DisplayName = "DHCP Management"
-                    MscFile     = "DHCP.msc"
-                }
-            }
-            { $PSItem -eq "DNS" -or $PSItem -eq "All" } {
-                $WindowsFeatures += "RSAT-DNS-Server"
-                $Components += @{
-                    Name        = "DNSMGMT"
-                    DisplayName = "AD DNS Management"
-                    MscFile     = "DNS.msc"
-                }
-            }
-            { $PSItem -eq "GPMC" -or $PSItem -eq "All" } {
-                $WindowsFeatures += "GPMC"
-                $Components += @{
-                    Name        = "GPMC"
-                    DisplayName = "Group Policy Management"
-                    MscFile     = "GPMC.msc"
-                    GPMC        = $true
-                }
-            }
-        }
+# Only prompt for admin credentials if we need to import connection components.
 
-        $tinaCreds = Get-Credential -Message "Please enter CyberArk credentials to import connection component or cancel to skip."
+$ListApplicationsWithoutConnectionComponents = "GoogleChromeX86", "GoogleChromeX64", "SqlMgmtStudio18"
+
+switch ($Application) {
+    { $PSItem -in $ListApplicationsWithoutConnectionComponents } {
+        continue
+    }
+    Default {
+        $tinaCreds = Get-Credential -Message "Please enter CyberArk credentials to import connection components or cancel to skip." 
+        # Break out of the switch. No need to evaluate other items in $Application. If there's at least one we need to get credentials.
         if ($tinaCreds) {
             Write-LogMessage -type Verbose -MSG "Logging in to CyberArk"
             $pvwaToken = New-ConnectionToRestAPI -pvwaAddress $pvwaAddress -tinaCreds $tinaCreds
             if (Test-PvwaToken -Token $pvwaToken -pvwaAddress $pvwaAddress) {
                 Write-LogMessage -type Verbose -MSG "Successfully logged in"
+                $Tasks += "Add the newly created connection components to any domain platforms."
             }
             else {
                 Write-LogMessage -type Verbose -MSG "Error logging in to CyberArk"
                 exit 1
             }
-            Write-LogMessage -type Info -MSG "Importing connection components"
-            $ComponentZipFile = "$CurrentDirectory\Supplemental\GenericMmc\ConnectionComponent.zip"
-            foreach ($Component in $Components) {
-                $TargetComponentZipFile = $env:temp + "\CC-" + $Component.Name + "-" + (Get-Date -UFormat '%Y%m%d%H%M%S') + ".zip"
-                Write-LogMessage -type Verbose -MSG "Preparing connection component"
-                Set-GenericMmcConnectionComponent -PSMInstallationFolder $PSMInstallationFolder `
-                    -ComponentZipFile $ComponentZipFile `
-                    -TargetComponentZipFile $TargetComponentZipFile `
-                    -ComponentName ("PSM-" + $Component.Name) `
-                    -ComponentDisplayName $Component.DisplayName `
-                    -MSCPath ("C:\PSMApps\" + $Component.MscFile) `
-                    -SupportGPMC:$Component.GPMC
-                $result = Import-PSMConnectionComponent -Input_File $TargetComponentZipFile -pvwaAddress $pvwaAddress -pvwaToken $pvwaToken -ComponentName $Component.Name
-                if ($result) {
-                    Write-LogMessage -type Verbose "Successfully imported connection component"
+        }
+        else {
+            Write-LogMessage -type Warning -MSG "No credentials provided. Will not import connection components."
+        }
+        break
+    }
+}
+
+$ListMmcApps = "ADSS", "ADDT", "ADUC", "DHCP", "DNS", "GPMC"
+
+# Check whether any of the requested applications are MMC-based, by checking for intersections between the $Applications array and an array of the MMC-based applications
+# If any are present, we'll install the dipatcher, MSC Files, and install the required Windows Features
+$MmcAppsTest = $Application | Where-Object { $ListMmcApps -contains $_ }
+
+if ($MmcAppsTest) {
+    Write-LogMessage -type Info -MSG "Installing dispatcher"
+    Expand-Archive -Path "$CurrentDirectory\Supplemental\GenericMmc\Dispatcher.zip" -DestinationPath "$PSMInstallationFolder\Components\" -Force
+    
+    Write-LogMessage -type Info -MSG "Adding MMC and dispatcher to AppLocker configuration"
+    $AppLockerEntries = @(
+        (New-PSMApplicationElement -Xml $xml -EntryType Application -Name MMC -FileType Exe -Path "C:\Windows\System32\MMC.exe" -Method Hash)
+    )
+    Add-PSMConfigureAppLockerSection -SectionName "Microsoft Management Console (MMC)" -XmlDoc ([REF]$xml) -AppLockerEntries $AppLockerEntries
+    
+    $AppLockerEntries = @(
+        (New-PSMApplicationElement -Xml $xml -EntryType Application -Name PSM-MMCDispatcher -FileType Exe -Path "$PSMInstallationFolder\Components\PSMMMCDispatcher.exe" -Method Hash)
+    )
+    Add-PSMConfigureAppLockerSection -SectionName "PSM Generic MMC Dispatcher" -XmlDoc ([REF]$xml) -AppLockerEntries $AppLockerEntries
+    
+    Write-LogMessage -type Info -MSG "Installing MSC Files"
+    If (!(Test-Path -Path "C:\PSMApps" -PathType Container)) {
+        try {
+            $null = New-Item -ItemType Directory -Path "C:\PSMApps"
+        }
+        catch {
+            Write-LogMessage -type Error -MSG "Error creating C:\PSMApps folder"
+            Exit 1
+        }
+    }
+    Expand-Archive -Path "$CurrentDirectory\Supplemental\GenericMmc\MscFiles.zip" -DestinationPath "C:\PSMApps\" -Force
+    break # Only install MMC dispatcher once.
+    $Components = @()
+    $WindowsFeatures = @()
+    switch ($Application) {
+        { $PSItem -in "ADSS", "ADDT", "ADUC" } {
+            $WindowsFeatures += "RSAT-ADDS-Tools"
+            switch ($PSItem) {
+                "ADUC" {
+                    $Components += @{
+                        Name        = "ADUC"
+                        DisplayName = "AD Users & Computers"
+                        MscFile     = "ADUC.msc"
+                    }
+                }
+                "ADDT" {
+                    $Components += @{
+                        Name        = "ADDT"
+                        DisplayName = "AD Domains & Trusts"
+                        MscFile     = "ADDT.msc"
+                    }
+                }
+                "ADSS" {
+                    $Components += @{
+                        Name        = "ADSS"
+                        DisplayName = "AD Sites & Services"
+                        MscFile     = "ADSS.msc"
+                    }
                 }
             }
         }
-        else {
-            Write-LogMessage -type Warning -MSG "No credentials provided. Will not import connection component."
-        }
-        Write-LogMessage -type Info -MSG "Installing Remote Server Administration Tools"
-        try {
-            Install-WindowsFeature $WindowsFeatures
-        }
-        catch {
-            Write-LogMessage -type Error -MSG "Error installing Remote Server Administration Tools. Please resolve try again."
-            exit 1
-        }
-
-        Write-LogMessage -type Info -MSG "Installing dispatcher"
-        Expand-Archive -Path "$CurrentDirectory\Supplemental\GenericMmc\Dispatcher.zip" -DestinationPath "$PSMInstallationFolder\Components\" -Force
-
-        Write-LogMessage -type Info -MSG "Adding MMC and dispatcher to AppLocker configuration"
-        $AppLockerEntries = @(
-            (New-PSMApplicationElement -Xml $xml -EntryType Application -Name MMC -FileType Exe -Path "C:\Windows\System32\MMC.exe" -Method Hash)
-        )
-        Add-PSMConfigureAppLockerSection -SectionName "Microsoft Management Console (MMC)" -XmlDoc ([REF]$xml) -AppLockerEntries $AppLockerEntries
-
-        $AppLockerEntries = @(
-            (New-PSMApplicationElement -Xml $xml -EntryType Application -Name PSM-MMCDispatcher -FileType Exe -Path "$PSMInstallationFolder\Components\PSMMMCDispatcher.exe" -Method Hash)
-        )
-        Add-PSMConfigureAppLockerSection -SectionName "PSM Generic MMC Dispatcher" -XmlDoc ([REF]$xml) -AppLockerEntries $AppLockerEntries
-
-        Write-LogMessage -type Info -MSG "Installing Generic MMC dispatcher"
-        If (!(Test-Path -Path "C:\PSMApps" -PathType Container)) {
-            try {
-                $null = New-Item -ItemType Directory -Path "C:\PSMApps"
-            }
-            catch {
-                Write-LogMessage -type Error -MSG "Error creating C:\PSMApps folder"
-                Exit 1
+        { $PSItem -in "DHCP" } {
+            Write-Verbose "DHCP"
+            $WindowsFeatures += "RSAT-DHCP"
+            $Components += @{
+                Name        = "DHCPMGMT"
+                DisplayName = "DHCP Management"
+                MscFile     = "DHCP.msc"
             }
         }
-        Expand-Archive -Path "$CurrentDirectory\Supplemental\GenericMmc\MscFiles.zip" -DestinationPath "C:\PSMApps\" -Force
+        { $PSItem -in "DNS" } {
+            $WindowsFeatures += "RSAT-DNS-Server"
+            $Components += @{
+                Name        = "DNSMGMT"
+                DisplayName = "AD DNS Management"
+                MscFile     = "DNS.msc"
+            }
+        }
+        { $PSItem -in "GPMC" } {
+            $WindowsFeatures += "GPMC"
+            $Components += @{
+                Name        = "GPMC"
+                DisplayName = "Group Policy Management"
+                MscFile     = "GPMC.msc"
+                GPMC        = $true
+            }
+        }
 
-        $Tasks += "Add the newly created connection components to any domain platforms. Available components:"
-        $Tasks += "  AD Users & Computers"
-        $Tasks += "  AD Domains & Trusts"
-        $Tasks += "  AD Sites & Services"
-        $Tasks += "  DNS Management"
-        $Tasks += "  DHCP Management"
-        $Tasks += "  Group Policy Management"
+    }
+    Write-LogMessage -type Info -MSG "Installing Remote Server Administration Tools"
+    try {
+        $null = Install-WindowsFeature $WindowsFeatures
+    }
+    catch {
+        Write-LogMessage -type Error -MSG "Error installing Remote Server Administration Tools. Please resolve try again."
+        exit 1
+    }
+
+    if ($tinaCreds) {
+        Write-LogMessage -type Info -MSG "Importing connection components"
+        $ComponentZipFile = "$CurrentDirectory\Supplemental\GenericMmc\ConnectionComponent.zip"
+        foreach ($Component in $Components) {
+            $TargetComponentZipFile = $env:temp + "\CC-" + $Component.Name + "-" + (Get-Date -UFormat '%Y%m%d%H%M%S') + ".zip"
+            Write-LogMessage -type Verbose -MSG "Preparing connection component"
+            Set-GenericMmcConnectionComponent -PSMInstallationFolder $PSMInstallationFolder `
+                -ComponentZipFile $ComponentZipFile `
+                -TargetComponentZipFile $TargetComponentZipFile `
+                -ComponentName ("PSM-" + $Component.Name) `
+                -ComponentDisplayName $Component.DisplayName `
+                -MSCPath ("C:\PSMApps\" + $Component.MscFile) `
+                -SupportGPMC:$Component.GPMC `
+                -HTML5 $HTML5
+            $result = Import-PSMConnectionComponent -Input_File $TargetComponentZipFile -pvwaAddress $pvwaAddress -pvwaToken $pvwaToken -ComponentName $Component.Name
+            if ($result) {
+                Write-LogMessage -type Verbose "Successfully imported connection component"
+            }
+        }
+    }
+
+    If ("GPMC" -in $Application) {
         $Tasks += "Note: To support Group Policy Management:"
         $Tasks += "  The target account must have the `"Allow Log on Locally`" user right."
         $Tasks += "  If the target account is an administrator on the CyberArk server, UAC must be disabled."
         $Tasks += "  Please consider the risks carefully before enabling this connection component."
     }
+}
+
+switch ($Application) {
     # Generic MMC connector
     "GenericMMC" {
         If (
@@ -818,7 +818,7 @@ switch ($Application) {
             Write-LogMessage -type Error -MSG "ComponentName, ComponentDisplayName and MscPath are mandatory for Generic MMC components"
             exit 1
         }
-        $tinaCreds = Get-Credential -Message "Please enter CyberArk credentials to import connection component."
+        if ($tinaCreds) {
         $ComponentZipFile = "$CurrentDirectory\Supplemental\GenericMmc\ConnectionComponent.zip"
         $TargetComponentZipFile = $env:temp + "\CC-" + (Get-Date -UFormat '%Y%m%d%H%M%S') + ".zip"
         Set-GenericMmcConnectionComponent -PSMInstallationFolder $PSMInstallationFolder `
@@ -828,17 +828,6 @@ switch ($Application) {
             -ComponentDisplayName $ComponentDisplayName `
             -MSCPath $MSCPath `
             -SupportGPMC:$SupportGPMC
-        if ($tinaCreds) {
-            Write-LogMessage -type Info -MSG "Importing connection component"
-            Write-LogMessage -type Verbose -MSG "Logging in to CyberArk"
-            $pvwaToken = New-ConnectionToRestAPI -pvwaAddress $pvwaAddress -tinaCreds $tinaCreds
-            if (Test-PvwaToken -Token $pvwaToken -pvwaAddress $pvwaAddress) {
-                Write-LogMessage -type Verbose -MSG "Successfully logged in"
-            }
-            else {
-                Write-LogMessage -type Verbose -MSG "Error logging in to CyberArk"
-                exit 1
-            }
             $result = Import-PSMConnectionComponent -ComponentName $ComponentName -Input_File $TargetComponentZipFile -pvwaAddress $pvwaAddress -pvwaToken $pvwaToken
             if ($result) {
                 Write-LogMessage -type Verbose "Successfully imported connection component"
@@ -861,11 +850,10 @@ switch ($Application) {
         Add-PSMConfigureAppLockerSection -SectionName "PSM Generic MMC Dispatcher" -XmlDoc ([REF]$xml) -AppLockerEntries $AppLockerEntries
 
         Write-LogMessage -type Info -MSG "Installing Generic MMC dispatcher"
-        Expand-Archive -Path "$CurrentDirectory\Supplemental\GenericMmc\OtherFiles.zip" -DestinationPath "$env:temp\" -Force
-        Copy-Item -Path "$env:temp\PSMMMCDispatcher.exe" -Destination $PSMInstallationFolder\Components\ -Force
+        Expand-Archive -Path "$CurrentDirectory\Supplemental\GenericMmc\Dispatcher.zip" -DestinationPath $PSMInstallationFolder\Components\ -Force
 
-        $Tasks += "Create $MscFile"
-        $Tasks += "Add the Active Directory Users and Computers connection component to any domain platforms"
+        $Tasks += "Create $MSCPath"
+        $Tasks += "Add the `"$ComponentDisplayName`" connection component to applicable domain platforms"
     }
     "TOTPToken" {
         $ZipPath = "$CurrentDirectory\PSM-TOTPToken.zip"
@@ -876,16 +864,6 @@ switch ($Application) {
 
         $tinaCreds = Get-Credential -Message "Please enter CyberArk credentials to import connection component."
         if ($tinaCreds) {
-            Write-LogMessage -type Info -MSG "Importing connection component"
-            Write-LogMessage -type Verbose -MSG "Logging in to CyberArk"
-            $pvwaToken = New-ConnectionToRestAPI -pvwaAddress $pvwaAddress -tinaCreds $tinaCreds
-            if (Test-PvwaToken -Token $pvwaToken -pvwaAddress $pvwaAddress) {
-                Write-LogMessage -type Verbose -MSG "Successfully logged in"
-            }
-            else {
-                Write-LogMessage -type Verbose -MSG "Error logging in to CyberArk"
-                exit 1
-            }
             $result = Import-PSMConnectionComponent -ComponentName TOTPToken -Input_File "$ZipPath" -pvwaAddress $pvwaAddress -pvwaToken $pvwaToken
             if ($result) {
                 Write-LogMessage -type Verbose "Successfully imported connection component"
