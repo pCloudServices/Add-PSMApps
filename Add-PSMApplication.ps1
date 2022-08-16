@@ -5,6 +5,10 @@ param (
     [string[]]
     $Application,
     [Parameter(Mandatory = $false)]
+    [ValidateSet("Default", "OnByDefault", "OffByDefault")]
+    [string]
+    $HTML5 = "Default",
+    [Parameter(Mandatory = $false)]
     [string]
     $MSCPath,
     [Parameter(Mandatory = $false)]
@@ -100,6 +104,10 @@ Function Import-PSMConnectionComponent {
     #>
 
     param($ComponentName, $Input_File, $pvwaAddress, $pvwaToken)
+    If ($HTML5 -ne "Default") {
+        Write-LogMessage -type Verbose -MSG "Modifying $Input_File to set AllowSelectHTML5 to $HTML5..."
+        Set-HTML5Parameter -ComponentZipFile $Input_File -HTML5 $HTML5
+    }
     Write-LogMessage -type Verbose -MSG "Importing $Input_File..."
     $Input_File_Bytes = ([IO.File]::ReadAllBytes($Input_File))
     $Input_File_Base64 = [Convert]::ToBase64String($Input_File_Bytes)
@@ -567,25 +575,87 @@ Function Set-GenericMmcConnectionComponent {
         
         # Modify CC
         If ($SupportGPMC) {
-            $element = ($xmlContent.ConnectionComponent.TargetSettings.ClientSpecific.SelectSingleNode("/ConnectionComponent/TargetSettings/ClientSpecific/Parameter[@Name='LogonFlag']"))
-            $element.SetAttribute("Value", "1")
+            $Element = ($xmlContent.ConnectionComponent.TargetSettings.ClientSpecific.SelectSingleNode("/ConnectionComponent/TargetSettings/ClientSpecific/Parameter[@Name='LogonFlag']"))
+            $Element.SetAttribute("Value", "1")
         }
-        $element = ($xmlContent.ConnectionComponent.TargetSettings.ClientSpecific.SelectSingleNode("/ConnectionComponent/TargetSettings/ClientSpecific/Parameter[@Name='ClientInstallationPath']"))
-        $element.SetAttribute("Value", $MSCPath)
+        $Element = ($xmlContent.ConnectionComponent.TargetSettings.ClientSpecific.SelectSingleNode("/ConnectionComponent/TargetSettings/ClientSpecific/Parameter[@Name='ClientInstallationPath']"))
+        $Element.SetAttribute("Value", $MSCPath)
         $xmlContent.ConnectionComponent.SetAttribute("DisplayName", $ComponentDisplayName)
         $xmlContent.ConnectionComponent.SetAttribute("Id", $ComponentName)
-        
+            
         # Save modified XML
         $xmlContent.Save($fileEntries[0].FullName)
-
+            
         # Zip the file back again.
-        Compress-Archive -DestinationPath $TargetComponentZipFile -Path $tempFolder\*.xml
-
+        Compress-Archive -DestinationPath $TargetComponentZipFile -Path $tempFolder\*.xml -Force
+            
         #Delete temporary Files
         Remove-Item $tempFolder -Recurse
     }
     Catch {
         Write-LogMessage -type Error -MSG $_.Exception
+        exit 1
+    }
+}
+
+Function Set-HTML5Parameter {
+    Param(
+        [Parameter(Mandatory = $true)]
+        [string]
+        $ComponentZipFile,
+        [Parameter(Mandatory = $true)]
+        [string]
+        $HTML5Preference
+    )
+
+    Try {
+        # Extract ZIP to temp folder logic
+        $TempDate = Get-Date -UFormat '%Y%m%d%H%M%S'
+        $tempFolder = $env:temp + "\CC-$ComponentName-$TempDate"
+    
+        #Remove folder if it exists already before unzipping 
+        if (Test-Path $tempFolder) {
+            Remove-Item -Recurse $tempFolder -Force
+        }	
+        #Unzip to temp folder
+        $null = Expand-Archive $ComponentZipFile -DestinationPath $tempFolder
+
+        # Find all XML files in the ConnectionComponent ZIP
+        $fileEntries = Get-ChildItem -Path $tempFolder -Filter '*.xml'
+
+        #Read XML file
+        $xmlContent = New-Object System.Xml.XmlDocument
+        $xmlContent.Load($fileEntries[0].FullName)
+        
+        # Modify CC
+
+        $HTML5Element = $xmlContent.CreateElement("Parameter")
+        $HTML5Element.SetAttribute("Name", "AllowSelectHTML5")
+        $HTML5Element.SetAttribute("DisplayName", "In Browser")
+        $HTML5Element.SetAttribute("Type", "CyberArk.TransparentConnection.BooleanUserParameter, CyberArk.PasswordVault.TransparentConnection")
+        $HTML5Element.SetAttribute("Required", "Yes")
+        $HTML5Element.SetAttribute("Visible", "Yes")
+        If ($HTML5Preference -eq "OnByDefault") {
+            $HTML5Element.SetAttribute("Value", "Yes")
+        }
+        else {
+            $HTML5Element.SetAttribute("Value", "No")
+        }
+        $UserParametersElement = ($xmlContent.ConnectionComponent.TargetSettings.ClientSpecific.SelectSingleNode("/ConnectionComponent/UserParameters"))
+        $null = $UserParametersElement.AppendChild($HTML5Element)
+            
+        # Save modified XML
+        $xmlContent.Save($fileEntries[0].FullName)
+            
+        # Zip the file back again.
+        Compress-Archive -DestinationPath $TargetComponentZipFile -Path $tempFolder\*.xml -Force
+            
+        #Delete temporary Files
+        Remove-Item $tempFolder -Recurse
+    }
+    Catch {
+        Write-LogMessage -type Error -MSG $_.Exception
+        exit 1
     }
 }
 
@@ -622,6 +692,7 @@ Function Test-PSMWebAppSupport {
 $global:InVerbose = $PSBoundParameters.Verbose.IsPresent
 $ScriptLocation = Split-Path -Parent $MyInvocation.MyCommand.Path
 $global:LOG_FILE_PATH = "$ScriptLocation\_Add-PSMApplication.log"
+$global:HTML5 = $HTML5
 
 $CurrentDirectory = (Get-Location).Path
 $PSMInstallationFolder = Get-PSMDirectory
@@ -859,10 +930,10 @@ switch ($Application) {
             Write-LogMessage -type Error -MSG "Please download PSM-TOTPToken.zip from https://cyberark-customers.force.com/mplace/s/#a352J000000GPw5QAG-a392J000002hZX8QAM and place it in $CurrentDirectory"
             exit 1
         }
+        $TargetComponentZipFile = "$env:temp\CC-TOTPToken.zip"
 
-        $tinaCreds = Get-Credential -Message "Please enter CyberArk credentials to import connection component."
         if ($tinaCreds) {
-            $result = Import-PSMConnectionComponent -ComponentName TOTPToken -Input_File "$ZipPath" -pvwaAddress $pvwaAddress -pvwaToken $pvwaToken
+            $result = Import-PSMConnectionComponent -ComponentName TOTPToken -Input_File "$TargetComponentZipFile" -pvwaAddress $pvwaAddress -pvwaToken $pvwaToken
             if ($result) {
                 Write-LogMessage -type Verbose "Successfully imported connection component"
             }

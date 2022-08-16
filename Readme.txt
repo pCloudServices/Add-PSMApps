@@ -20,6 +20,12 @@ The script is provided in a zip file containing:
 Mandatory parameters (Add-PSMApplication will prompt for these if not provided on the command line):
 	- Application - A comma-separated list of the applications to configure
 
+Optional parameters:
+	- HTML5 - Add HTML5 Gateway options to the connection component. Possible values:
+    - Default - Use the platform default; do not create an HTML5 gateway user parameter
+    - OnByDefault - Let the user choose whether to open the connection in browser. Enable by default.
+    - OffByDefault - Let the user choose whether to open the connection in browser. Disable by default.
+
 The script will prompt for credentials for the _admin account or installeruser account, to
   import required components to the Privilege Cloud platform. This only needs to be supplied
   once, and can be skipped when executing the script on additional connector servers.
