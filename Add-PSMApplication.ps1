@@ -559,8 +559,8 @@ Function Set-GenericMmcConnectionComponent {
 
     Try {
         # Extract ZIP to temp folder logic
-        $TempDate = Get-Date -UFormat '%Y%m%d%H%M%S'
-        $tempFolder = $env:temp + "\CC-$ComponentName-$TempDate"
+        $TempGuid = [guid]::NewGuid().ToString()
+        $tempFolder = $env:temp + "\CC-$ComponentName-$TempGuid"
     
         #Remove folder if it exists already before unzipping 
         if (Test-Path $tempFolder) {
@@ -613,8 +613,8 @@ Function Set-HTML5Parameter {
 
     Try {
         # Extract ZIP to temp folder logic
-        $TempDate = Get-Date -UFormat '%Y%m%d%H%M%S'
-        $tempFolder = $env:temp + "\CC-$ComponentName-$TempDate"
+        $TempGuid = [guid]::NewGuid().ToString()
+        $tempFolder = $env:temp + "\CC-$ComponentName-$TempGuid"
     
         #Remove folder if it exists already before unzipping 
         if (Test-Path $tempFolder) {
