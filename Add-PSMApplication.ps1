@@ -934,7 +934,25 @@ switch ($Application) {
             Write-LogMessage -type Error -MSG "Please download PSM-TOTPToken.zip from https://cyberark-customers.force.com/mplace/s/#a352J000000GPw5QAG-a392J000002hZX8QAM and place it in $CurrentDirectory"
             exit 1
         }
-        $TargetComponentZipFile = "$env:temp\CC-TOTPToken.zip"
+
+        $TempGuid = [guid]::NewGuid().ToString()
+        $TempDir = "$env:temp\$TempGuid"
+
+        If (!(Test-Path -Path $TempDir -PathType Container)) {
+            try {
+                $null = New-Item -ItemType Directory -Path $TempDir
+            }
+            catch {
+                Write-LogMessage -type Error -MSG "Error creating $TempDir folder"
+                Exit 1
+            }
+        }
+    
+        Expand-Archive -Path $ZipPath -DestinationPath $TempDir -Force
+
+        $TargetComponentZipFile = "$TempDir\CC-TOTPToken.zip"
+
+        Compress-Archive -Path "$TempDir\*.xml" -DestinationPath $TargetComponentZipFile
 
         if ($tinaCreds) {
             $result = Import-PSMConnectionComponent -ComponentName TOTPToken -Input_File "$TargetComponentZipFile" -pvwaAddress $PortalUrl -pvwaToken $pvwaToken
@@ -946,7 +964,6 @@ switch ($Application) {
             Write-LogMessage -type Warning -MSG "No credentials provided. Will not import connection component."
         }
 
-        Expand-Archive -Path $ZipPath -DestinationPath $env:temp -Force
         Copy-Item -Path "$env:temp\TOTPToken.exe" -Destination "$PSMInstallationFolder\Components\" -Force
         $RunHardening = $true
 
