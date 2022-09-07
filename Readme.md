@@ -22,11 +22,13 @@ Add-PSMApplication will prompt for these if not provided on the command line
 | Application   | A comma-separated list of the applications to configure |
 
 ### Optional Parameters
-| Parameter | Valid Values	                     | Description  	                                                                   |
-| ---       | ---	                               | ---	                                                                             |
-| HTML5     | Default, OnByDefault, OffByDefault | Control the creation of an AllowSelectHTML5 user parameter, and its default Value |
+| Parameter | Valid Values	                     | Description  	                                                                    |
+| ---       | ---	                               | ---	                                                                              |
+| HTML5     | Default, OnByDefault, OffByDefault | Control the creation of an AllowSelectHTML5 user parameter, and its default Value  |
+| PortalUrl | Privilege Cloud portal address     | The address of the Privilege Cloud web portal.                                     |
 
-If `-HTML5` is omitted, or set to Default, the AllowSelectHTML5 user parameter will not be created.
+If `-HTML5` is omitted, or set to Default, the AllowSelectHTML5 user parameter will not be created.  
+`PortalUrl` Will be detected automatically in most environments.
 
 ## Applications
 ### Valid applications

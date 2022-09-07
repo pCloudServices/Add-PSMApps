@@ -19,7 +19,10 @@ param (
     $ComponentDisplayName,
     [Parameter(Mandatory = $false)]
     [switch]
-    $SupportGPMC
+    $SupportGPMC,
+    [Parameter(Mandatory = $false)]
+    [string]
+    $PortalUrl
 )
 
 Function Add-PSMConfigureAppLockerSection {
@@ -716,8 +719,9 @@ $xml = New-Object System.Xml.XmlDocument
 #$xml.PreserveWhitespace = $true
 $xml.Load("$PSMInstallationFolder\Hardening\PSMConfigureAppLocker.xml")
 
-$pvwaAddress = Get-PvwaAddress -psmRootInstallLocation $PSMInstallationFolder
-
+If (!($PortalUrl)) {
+    $PortalUrl = Get-PvwaAddress -psmRootInstallLocation $PSMInstallationFolder
+}
 $Tasks = @()
 
 # Only prompt for admin credentials if we need to import connection components.
