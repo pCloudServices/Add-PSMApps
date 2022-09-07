@@ -737,8 +737,8 @@ switch ($Application) {
         # Break out of the switch. No need to evaluate other items in $Application. If there's at least one we need to get credentials.
         if ($tinaCreds) {
             Write-LogMessage -type Verbose -MSG "Logging in to CyberArk"
-            $pvwaToken = New-ConnectionToRestAPI -pvwaAddress $pvwaAddress -tinaCreds $tinaCreds
-            if (Test-PvwaToken -Token $pvwaToken -pvwaAddress $pvwaAddress) {
+            $pvwaToken = New-ConnectionToRestAPI -pvwaAddress $PortalUrl -tinaCreds $tinaCreds
+            if (Test-PvwaToken -Token $pvwaToken -pvwaAddress $PortalUrl) {
                 Write-LogMessage -type Verbose -MSG "Successfully logged in"
                 $Tasks += "Add the newly created connection components to any domain platforms."
             }
@@ -865,7 +865,7 @@ if ($MmcAppsTest) {
                 -ComponentDisplayName $Component.DisplayName `
                 -MSCPath ("C:\PSMApps\" + $Component.MscFile) `
                 -SupportGPMC:$Component.GPMC
-            $result = Import-PSMConnectionComponent -Input_File $TargetComponentZipFile -pvwaAddress $pvwaAddress -pvwaToken $pvwaToken -ComponentName $Component.Name
+            $result = Import-PSMConnectionComponent -Input_File $TargetComponentZipFile -pvwaAddress $PortalUrl -pvwaToken $pvwaToken -ComponentName $Component.Name
             if ($result) {
                 Write-LogMessage -type Verbose "Successfully imported connection component"
             }
@@ -901,7 +901,7 @@ switch ($Application) {
                 -ComponentDisplayName $ComponentDisplayName `
                 -MSCPath $MSCPath `
                 -SupportGPMC:$SupportGPMC
-            $result = Import-PSMConnectionComponent -ComponentName $ComponentName -Input_File $TargetComponentZipFile -pvwaAddress $pvwaAddress -pvwaToken $pvwaToken
+            $result = Import-PSMConnectionComponent -ComponentName $ComponentName -Input_File $TargetComponentZipFile -pvwaAddress $PortalUrl -pvwaToken $pvwaToken
             if ($result) {
                 Write-LogMessage -type Verbose "Successfully imported connection component"
             }
@@ -937,7 +937,7 @@ switch ($Application) {
         $TargetComponentZipFile = "$env:temp\CC-TOTPToken.zip"
 
         if ($tinaCreds) {
-            $result = Import-PSMConnectionComponent -ComponentName TOTPToken -Input_File "$TargetComponentZipFile" -pvwaAddress $pvwaAddress -pvwaToken $pvwaToken
+            $result = Import-PSMConnectionComponent -ComponentName TOTPToken -Input_File "$TargetComponentZipFile" -pvwaAddress $PortalUrl -pvwaToken $pvwaToken
             if ($result) {
                 Write-LogMessage -type Verbose "Successfully imported connection component"
             }
