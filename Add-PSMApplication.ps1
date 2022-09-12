@@ -964,7 +964,7 @@ switch ($Application) {
             Write-LogMessage -type Warning -MSG "No credentials provided. Will not import connection component."
         }
 
-        Copy-Item -Path "$env:temp\TOTPToken.exe" -Destination "$PSMInstallationFolder\Components\" -Force
+        Copy-Item -Path "$TempDir\TOTPToken.exe" -Destination "$PSMInstallationFolder\Components\" -Force
         $RunHardening = $true
 
         $AppLockerEntries = @(
