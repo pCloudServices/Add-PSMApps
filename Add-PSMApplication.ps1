@@ -438,7 +438,7 @@ function Install-Chromium {
         [string]$Type
     )
     
-    Write-LogMessage -type Verbose -MSG "Downloading Chrome"
+    Write-LogMessage -type Verbose -MSG "Downloading $Type"
     $ProgressPreference = "SilentlyContinue" # https://github.com/PowerShell/PowerShell/issues/13414
     Invoke-WebRequest $DownloadUrl -OutFile $OutFile
     $ProgressPreference = "Continue"
