@@ -56,7 +56,6 @@ Function Add-PSMConfigureAppLockerSection {
         $XmlEntry = $_
         # check if it already exists
         $ExistingEntries = $XmlDoc.PSMAppLockerConfiguration.AllowedApplications.SelectSingleNode("/PSMAppLockerConfiguration/AllowedApplications/comment()[. = '$($XmlEntry.Value)']")
-        $ExistingEntries | Select-Object * | Out-File -FilePath log1.txt
         If (!($ExistingEntries)) {
             If ($SectionType -eq "Application") {
                 # And insert the new entry just above the Allowed DLLs comment
@@ -79,7 +78,6 @@ Function Add-PSMConfigureAppLockerSection {
             
         # check if it already exists
         $ExistingEntries = Get-PSMApplicationsByPath -Xml $XmlDoc -AppLockerEntry $AppLockerEntry
-        $ExistingEntries | Select-Object * | Out-File -FilePath log2.txt
         If (!($ExistingEntries)) {
             # Find the comment we added above
             $comment = $XmlDoc.PSMAppLockerConfiguration.AllowedApplications.SelectSingleNode("/PSMAppLockerConfiguration/AllowedApplications/comment()[. = ' $SectionName section ']")
