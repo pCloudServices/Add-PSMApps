@@ -727,7 +727,7 @@ $Tasks = @()
 
 # Only prompt for admin credentials if we need to import connection components.
 
-$ListApplicationsWithoutConnectionComponents = "GoogleChromeX86", "GoogleChromeX64", "SqlMgmtStudio18"
+$ListApplicationsWithoutConnectionComponents = "GoogleChromeX86", "GoogleChromeX64", "SqlMgmtStudio18", "MicrosoftEdgeX86", "MicrosoftEdgeX64"
 
 switch ($Application) {
     { $PSItem -in $ListApplicationsWithoutConnectionComponents } {
