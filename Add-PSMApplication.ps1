@@ -425,24 +425,27 @@ function New-XmlComment {
     Return $Element
 }
 
-function Install-GoogleChrome {
+function Install-Chromium {
     [CmdletBinding()]
     param (
         [Parameter(Mandatory = $true)]
         [string]$DownloadUrl,
         [Parameter(Mandatory = $true)]
-        [string]$OutFile
+        [string]$OutFile,
+        [Parameter(Mandatory = $true)]
+        [ValidateSet("Google Chrome", "Microsoft Edge")]
+        [string]$Type
     )
     
     Write-LogMessage -type Verbose -MSG "Downloading Chrome"
     $ProgressPreference = "SilentlyContinue" # https://github.com/PowerShell/PowerShell/issues/13414
     Invoke-WebRequest $DownloadUrl -OutFile $OutFile
     $ProgressPreference = "Continue"
-    Write-LogMessage -type Verbose -MSG "Installing Chrome"
+    Write-LogMessage -type Verbose -MSG "Installing $Type"
     $ChromeInstallResult = Start-Process -Wait msiexec.exe -ArgumentList "/qb!", "/i", $OutFile -PassThru 
     If ($ChromeInstallResult.ExitCode -ne 0) {
-        Write-LogMessage -type Error -MSG "Chrome installation failed. Please resolve the issue or install Chrome manually and try again."
-        Write-LogMessage -type Error -MSG "The Chrome installation MSI is located at $OutFile"
+        Write-LogMessage -type Error -MSG "$Type installation failed. Please resolve the issue or install $Type manually and try again."
+        Write-LogMessage -type Error -MSG "The $Type installation MSI is located at $OutFile"
         exit 1
     }
 
@@ -1008,7 +1011,7 @@ switch ($Application) {
             $DownloadUrl = "https://dl.google.com/edgedl/chrome/install/GoogleChromeStandaloneEnterprise.msi"
             $OutFile = "$env:temp\GoogleChromeStandaloneEnterprise.msi"
             Write-LogMessage -type Info -MSG "Downloading and installing Chrome"
-            $null = Install-GoogleChrome -DownloadUrl $DownloadUrl -OutFile $OutFile
+            $null = Install-Chromium -Type "Google Chrome" -DownloadUrl $DownloadUrl -OutFile $OutFile
         }
         $WebAppSupport = Test-PSMWebAppSupport -psmRootInstallLocation $PSMInstallationFolder
         If ($WebAppSupport) {
@@ -1043,7 +1046,7 @@ switch ($Application) {
             $DownloadUrl = "https://dl.google.com/edgedl/chrome/install/GoogleChromeStandaloneEnterprise64.msi"
             $OutFile = "$env:temp\GoogleChromeStandaloneEnterprise64.msi"
             Write-LogMessage -type Info -MSG "Downloading and installing Chrome"
-            $null = Install-GoogleChrome -DownloadUrl $DownloadUrl -OutFile $OutFile
+            $null = Install-Chromium -Type "Google Chrome" -DownloadUrl $DownloadUrl -OutFile $OutFile
         }
         $WebAppSupport = Test-PSMWebAppSupport -psmRootInstallLocation $PSMInstallationFolder
         If ($WebAppSupport) {
@@ -1078,7 +1081,7 @@ switch ($Application) {
             $DownloadUrl = "http://go.microsoft.com/fwlink/?LinkID=2093437"
             $OutFile = "$env:temp\MicrosoftEdgeStandaloneEnterprise64.msi"
             Write-LogMessage -type Info -MSG "Downloading and installing Microsoft Edge"
-            $null = Install-GoogleChrome -DownloadUrl $DownloadUrl -OutFile $OutFile
+            $null = Install-Chromium -Type "Microsoft Edge" -DownloadUrl $DownloadUrl -OutFile $OutFile
         }
         $WebAppSupport = Test-PSMWebAppSupport -psmRootInstallLocation $PSMInstallationFolder
         If ($WebAppSupport) {
@@ -1111,9 +1114,9 @@ switch ($Application) {
         }
         else {
             $DownloadUrl = "http://go.microsoft.com/fwlink/?LinkID=2093505"
-            $OutFile = "$env:temp\GoogleChromeStandaloneEnterprise64.msi"
+            $OutFile = "$env:temp\MicrosoftEdgeStandaloneEnterprise86.msi"
             Write-LogMessage -type Info -MSG "Downloading and installing Microsoft Edge"
-            $null = Install-GoogleChrome -DownloadUrl $DownloadUrl -OutFile $OutFile
+            $null = Install-Chromium -Type "Microsoft Edge" -DownloadUrl $DownloadUrl -OutFile $OutFile
         }
         $WebAppSupport = Test-PSMWebAppSupport -psmRootInstallLocation $PSMInstallationFolder
         If ($WebAppSupport) {
