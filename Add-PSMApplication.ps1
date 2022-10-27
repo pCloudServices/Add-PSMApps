@@ -1089,7 +1089,7 @@ switch ($Application) {
             Enable-PSMWebAppSupport -psmRootInstallLocation $PSMInstallationFolder -BackupFile $BackupHardeningXmlFilePath
             $RunHardening = $true
         }
-        $Path = "C:\Program Files\Google\Chrome\Application\chrome.exe"
+        $Path = "C:\Program Files\Microsoft\Edge\Application\msedge.exe"
 
         $AppLockerEntries = @(
             (New-PSMApplicationElement -Xml $xml -EntryType Application -Name MicrosoftEdge -FileType Exe -Path $Path -Method Publisher)
