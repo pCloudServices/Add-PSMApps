@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param (
     [Parameter(Mandatory = $true)]
-    [ValidateSet("GoogleChromeX86", "GoogleChromeX64", "SqlMgmtStudio18", "GenericMMC", "TOTPToken", "ADUC", "DNS", "DHCP", "ADDT", "ADSS", "GPMC")]
+    [ValidateSet("MicrosoftEdgeX86", "MicrosoftEdgeX64", "GoogleChromeX86", "GoogleChromeX64", "SqlMgmtStudio18", "GenericMMC", "TOTPToken", "ADUC", "DNS", "DHCP", "ADDT", "ADSS", "GPMC")]
     [string[]]
     $Application,
     [Parameter(Mandatory = $false)]
@@ -425,24 +425,27 @@ function New-XmlComment {
     Return $Element
 }
 
-function Install-GoogleChrome {
+function Install-Chromium {
     [CmdletBinding()]
     param (
         [Parameter(Mandatory = $true)]
         [string]$DownloadUrl,
         [Parameter(Mandatory = $true)]
-        [string]$OutFile
+        [string]$OutFile,
+        [Parameter(Mandatory = $true)]
+        [ValidateSet("Google Chrome", "Microsoft Edge")]
+        [string]$Type
     )
     
-    Write-LogMessage -type Verbose -MSG "Downloading Chrome"
+    Write-LogMessage -type Verbose -MSG "Downloading $Type"
     $ProgressPreference = "SilentlyContinue" # https://github.com/PowerShell/PowerShell/issues/13414
     Invoke-WebRequest $DownloadUrl -OutFile $OutFile
     $ProgressPreference = "Continue"
-    Write-LogMessage -type Verbose -MSG "Installing Chrome"
-    $ChromeInstallResult = Start-Process -Wait msiexec.exe -ArgumentList "/qb!", "/i", $OutFile -PassThru 
-    If ($ChromeInstallResult.ExitCode -ne 0) {
-        Write-LogMessage -type Error -MSG "Chrome installation failed. Please resolve the issue or install Chrome manually and try again."
-        Write-LogMessage -type Error -MSG "The Chrome installation MSI is located at $OutFile"
+    Write-LogMessage -type Verbose -MSG "Installing $Type"
+    $ChromiumInstallResult = Start-Process -Wait msiexec.exe -ArgumentList "/qb!", "/i", $OutFile -PassThru 
+    If ($ChromiumInstallResult.ExitCode -ne 0) {
+        Write-LogMessage -type Error -MSG "$Type installation failed. Please resolve the issue or install $Type manually and try again."
+        Write-LogMessage -type Error -MSG "The $Type installation MSI is located at $OutFile"
         exit 1
     }
 
@@ -685,12 +688,13 @@ Function Test-PSMWebAppSupport {
         }
     }
     catch {
-        Write-LogMessage -Type Error -MSG "Failed to enable web application support in PSMHardening.ps1 script, please verify the files manually."
+        Write-LogMessage -Type Error -MSG "Failed to verify web application support in PSMHardening.ps1 script, please verify the files manually."
         Write-LogMessage -Type Error -MSG $_
         Exit 1
     }
 }
 
+# Script start
 
 $global:InVerbose = $PSBoundParameters.Verbose.IsPresent
 $ScriptLocation = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -726,7 +730,7 @@ $Tasks = @()
 
 # Only prompt for admin credentials if we need to import connection components.
 
-$ListApplicationsWithoutConnectionComponents = "GoogleChromeX86", "GoogleChromeX64", "SqlMgmtStudio18"
+$ListApplicationsWithoutConnectionComponents = "GoogleChromeX86", "GoogleChromeX64", "SqlMgmtStudio18", "MicrosoftEdgeX86", "MicrosoftEdgeX64"
 
 switch ($Application) {
     { $PSItem -in $ListApplicationsWithoutConnectionComponents } {
@@ -734,7 +738,6 @@ switch ($Application) {
     }
     Default {
         $tinaCreds = Get-Credential -Message "Please enter CyberArk credentials to import connection components or cancel to skip." 
-        # Break out of the switch. No need to evaluate other items in $Application. If there's at least one we need to get credentials.
         if ($tinaCreds) {
             Write-LogMessage -type Verbose -MSG "Logging in to CyberArk"
             $pvwaToken = New-ConnectionToRestAPI -pvwaAddress $PortalUrl -tinaCreds $tinaCreds
@@ -750,6 +753,7 @@ switch ($Application) {
         else {
             Write-LogMessage -type Warning -MSG "No credentials provided. Will not import connection components."
         }
+        # Break out of the switch. No need to evaluate other items in $Application. If there's at least one we need to get credentials.
         break
     }
 }
@@ -840,6 +844,10 @@ if ($MmcAppsTest) {
                 MscFile     = "GPMC.msc"
                 GPMC        = $true
             }
+            $Tasks += "Note: To support Group Policy Management:"
+            $Tasks += "  The target account must have the `"Allow Log on Locally`" user right."
+            $Tasks += "  If the target account is an administrator on the CyberArk server, UAC must be disabled."
+            $Tasks += "  Please consider the risks carefully before enabling this connection component."
         }
 
     }
@@ -848,7 +856,7 @@ if ($MmcAppsTest) {
         $null = Install-WindowsFeature $WindowsFeatures
     }
     catch {
-        Write-LogMessage -type Error -MSG "Error installing Remote Server Administration Tools. Please resolve try again."
+        Write-LogMessage -type Error -MSG "Error installing Remote Server Administration Tools. Please resolve and try again."
         exit 1
     }
 
@@ -871,12 +879,8 @@ if ($MmcAppsTest) {
             }
         }
     }
-
-    If ("GPMC" -in $Application) {
-        $Tasks += "Note: To support Group Policy Management:"
-        $Tasks += "  The target account must have the `"Allow Log on Locally`" user right."
-        $Tasks += "  If the target account is an administrator on the CyberArk server, UAC must be disabled."
-        $Tasks += "  Please consider the risks carefully before enabling this connection component."
+    else {
+        Write-LogMessage -type Info -MSG "Installer user credentials not provided; skipping connection component creation"
     }
 }
 
@@ -996,8 +1000,8 @@ switch ($Application) {
     "GoogleChromeX86" {
         If (Test-Path "C:\Program Files\Google\Chrome\Application\chrome.exe") {
             Write-LogMessage -type Error -MSG "Chrome exists at `"C:\Program Files\Google\Chrome\Application\chrome.exe`""
-            Write-LogMessage -type Error -MSG "which is the 64-bit installation path. Please uninstall it and run script again, or"
-            Write-LogMessage -type Error -MSG "run the script with -Application GoogleChromeX64 instead"
+            Write-LogMessage -type Error -MSG "which is the 64-bit installation path. Please uninstall it and run script again if you"
+            Write-LogMessage -type Error -MSG "want to switch to the 32-bit version "
             exit 1
         }
         If (Test-Path "C:\Program Files (x86)\Google\Chrome\Application\chrome.exe") {
@@ -1007,7 +1011,7 @@ switch ($Application) {
             $DownloadUrl = "https://dl.google.com/edgedl/chrome/install/GoogleChromeStandaloneEnterprise.msi"
             $OutFile = "$env:temp\GoogleChromeStandaloneEnterprise.msi"
             Write-LogMessage -type Info -MSG "Downloading and installing Chrome"
-            $null = Install-GoogleChrome -DownloadUrl $DownloadUrl -OutFile $OutFile
+            $null = Install-Chromium -Type "Google Chrome" -DownloadUrl $DownloadUrl -OutFile $OutFile
         }
         $WebAppSupport = Test-PSMWebAppSupport -psmRootInstallLocation $PSMInstallationFolder
         If ($WebAppSupport) {
@@ -1031,8 +1035,8 @@ switch ($Application) {
         Write-LogMessage -type Info -MSG "Checking if Chrome 32 bit is present"
         If (Test-Path "C:\Program Files (x86)\Google\Chrome\Application\chrome.exe") {
             Write-LogMessage -type Error -MSG "Chrome exists at `"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe`""
-            Write-LogMessage -type Error -MSG "which is the 32-bit installation path. Please uninstall it and run script again, or"
-            Write-LogMessage -type Error -MSG "run the script with -Application GoogleChromeX86 instead"
+            Write-LogMessage -type Error -MSG "which is the 32-bit installation path. Please uninstall it and run script again if you"
+            Write-LogMessage -type Error -MSG "want to switch to the 64-bit version "
             exit 1
         }
         If (Test-Path "C:\Program Files (x86)\Google\Chrome\Application\chrome.exe") {
@@ -1042,7 +1046,7 @@ switch ($Application) {
             $DownloadUrl = "https://dl.google.com/edgedl/chrome/install/GoogleChromeStandaloneEnterprise64.msi"
             $OutFile = "$env:temp\GoogleChromeStandaloneEnterprise64.msi"
             Write-LogMessage -type Info -MSG "Downloading and installing Chrome"
-            $null = Install-GoogleChrome -DownloadUrl $DownloadUrl -OutFile $OutFile
+            $null = Install-Chromium -Type "Google Chrome" -DownloadUrl $DownloadUrl -OutFile $OutFile
         }
         $WebAppSupport = Test-PSMWebAppSupport -psmRootInstallLocation $PSMInstallationFolder
         If ($WebAppSupport) {
@@ -1060,6 +1064,77 @@ switch ($Application) {
         )
         Add-PSMConfigureAppLockerSection -SectionName "Google Chrome" -XmlDoc ([REF]$xml) -AppLockerEntries $AppLockerEntries
     }
+
+    # Microsoft Edge 64 bit
+    "MicrosoftEdgeX64" {
+        Write-LogMessage -type Info -MSG "Checking if Microsoft Edge 32 bit is present"
+        If (Test-Path "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe") {
+            Write-LogMessage -type Error -MSG "Microsoft Edge exists at `"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe`""
+            Write-LogMessage -type Error -MSG "which is the 32-bit installation path. Please uninstall it and run script again if you"
+            Write-LogMessage -type Error -MSG "want to switch to the 64-bit version "
+            exit 1
+        }
+        If (Test-Path "C:\Program Files\Microsoft\Edge\Application\msedge.exe") {
+            Write-LogMessage -type Info -MSG "Microsoft Edge appears to be installed already. Will not reinstall."
+        }
+        else {
+            $DownloadUrl = "http://go.microsoft.com/fwlink/?LinkID=2093437"
+            $OutFile = "$env:temp\MicrosoftEdgeStandaloneEnterprise64.msi"
+            Write-LogMessage -type Info -MSG "Downloading and installing Microsoft Edge"
+            $null = Install-Chromium -Type "Microsoft Edge" -DownloadUrl $DownloadUrl -OutFile $OutFile
+        }
+        $WebAppSupport = Test-PSMWebAppSupport -psmRootInstallLocation $PSMInstallationFolder
+        If ($WebAppSupport) {
+            Write-LogMessage -type Verbose -MSG "Web app support already enabled. Not modifying PSMHardening.ps1"
+        }
+        else {
+            Write-LogMessage -type Info "Enabling web app support in PSMHardening script"
+            Enable-PSMWebAppSupport -psmRootInstallLocation $PSMInstallationFolder -BackupFile $BackupHardeningXmlFilePath
+            $RunHardening = $true
+        }
+        $Path = "C:\Program Files\Microsoft\Edge\Application\msedge.exe"
+
+        $AppLockerEntries = @(
+            (New-PSMApplicationElement -Xml $xml -EntryType Application -Name MicrosoftEdge -FileType Exe -Path $Path -Method Publisher)
+        )
+        Add-PSMConfigureAppLockerSection -SectionName "Microsoft Edge" -XmlDoc ([REF]$xml) -AppLockerEntries $AppLockerEntries
+    }
+
+    # Microsoft Edge 32 bit
+    "MicrosoftEdgeX86" {
+        Write-LogMessage -type Info -MSG "Checking if Microsoft Edge 64 bit is present"
+        If (Test-Path "C:\Program Files\Microsoft\Edge\Application\msedge.exe") {
+            Write-LogMessage -type Error -MSG "Microsoft Edge exists at `"C:\Program Files\Microsoft\Edge\Application\msedge.exe`""
+            Write-LogMessage -type Error -MSG "which is the 64-bit installation path. Please uninstall it and run script again if you"
+            Write-LogMessage -type Error -MSG "want to switch to the 32-bit version "
+            exit 1
+        }
+        If (Test-Path "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe") {
+            Write-LogMessage -type Info -MSG "Microsoft Edge appears to be installed already. Will not reinstall."
+        }
+        else {
+            $DownloadUrl = "http://go.microsoft.com/fwlink/?LinkID=2093505"
+            $OutFile = "$env:temp\MicrosoftEdgeStandaloneEnterprise86.msi"
+            Write-LogMessage -type Info -MSG "Downloading and installing Microsoft Edge"
+            $null = Install-Chromium -Type "Microsoft Edge" -DownloadUrl $DownloadUrl -OutFile $OutFile
+        }
+        $WebAppSupport = Test-PSMWebAppSupport -psmRootInstallLocation $PSMInstallationFolder
+        If ($WebAppSupport) {
+            Write-LogMessage -type Verbose -MSG "Web app support already enabled. Not modifying PSMHardening.ps1"
+        }
+        else {
+            Write-LogMessage -type Info "Enabling web app support in PSMHardening script"
+            Enable-PSMWebAppSupport -psmRootInstallLocation $PSMInstallationFolder -BackupFile $BackupHardeningXmlFilePath
+            $RunHardening = $true
+        }
+        $Path = "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
+    
+        $AppLockerEntries = @(
+                (New-PSMApplicationElement -Xml $xml -EntryType Application -Name MicrosoftEdge -FileType Exe -Path $Path -Method Publisher)
+        )
+        Add-PSMConfigureAppLockerSection -SectionName "Microsoft Edge" -XmlDoc ([REF]$xml) -AppLockerEntries $AppLockerEntries
+    }
+    
 }
 
 try { Copy-Item -Force $AppLockerXmlFilePath $BackupAppLockerXmlFilePath }
