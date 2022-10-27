@@ -41,6 +41,8 @@ If `-HTML5` is omitted, or set to Default, the AllowSelectHTML5 user parameter w
 | DNS                   | Yes                     | DNS Management Console                                  |
 | DHCP                  | Yes                     | DHCP Management Console                                 |
 | GenericMMC            | Yes                     | User-configurable MMC-based connection component        |
+| MicrosoftEdgeX86      | No                      | Microsoft Edge 32-bit                                   |
+| MicrosoftEdgeX64      | No                      | Microsoft Edge 64-bit                                   |
 | GoogleChromeX86       | No                      | Google Chrome 32-bit                                    |
 | GoogleChromeX64       | No                      | Google Chrome 64-bit                                    |
 | SqlMgmtStudio18       | No                      | Microsoft SQL Management Studio 18                      |
@@ -78,7 +80,12 @@ Any instances of `{address}` in ClientInstallationPath will be replaced with the
 
 #### Google Chrome
 - Downloads and installs Google Chrome
-- Adds Chrome to AppLocker configuration
+- Adds Google Chrome to AppLocker configuration
+- Enables web application support
+
+#### Microsoft Edge
+- Downloads and installs Microsoft Edge
+- Adds Microsoft Edge to AppLocker configuration
 - Enables web application support
 
 #### Microsoft SQL Management Studio 18
