@@ -685,12 +685,13 @@ Function Test-PSMWebAppSupport {
         }
     }
     catch {
-        Write-LogMessage -Type Error -MSG "Failed to enable web application support in PSMHardening.ps1 script, please verify the files manually."
+        Write-LogMessage -Type Error -MSG "Failed to verify web application support in PSMHardening.ps1 script, please verify the files manually."
         Write-LogMessage -Type Error -MSG $_
         Exit 1
     }
 }
 
+# Script start
 
 $global:InVerbose = $PSBoundParameters.Verbose.IsPresent
 $ScriptLocation = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -734,7 +735,6 @@ switch ($Application) {
     }
     Default {
         $tinaCreds = Get-Credential -Message "Please enter CyberArk credentials to import connection components or cancel to skip." 
-        # Break out of the switch. No need to evaluate other items in $Application. If there's at least one we need to get credentials.
         if ($tinaCreds) {
             Write-LogMessage -type Verbose -MSG "Logging in to CyberArk"
             $pvwaToken = New-ConnectionToRestAPI -pvwaAddress $PortalUrl -tinaCreds $tinaCreds
@@ -750,6 +750,7 @@ switch ($Application) {
         else {
             Write-LogMessage -type Warning -MSG "No credentials provided. Will not import connection components."
         }
+        # Break out of the switch. No need to evaluate other items in $Application. If there's at least one we need to get credentials.
         break
     }
 }
@@ -840,6 +841,10 @@ if ($MmcAppsTest) {
                 MscFile     = "GPMC.msc"
                 GPMC        = $true
             }
+            $Tasks += "Note: To support Group Policy Management:"
+            $Tasks += "  The target account must have the `"Allow Log on Locally`" user right."
+            $Tasks += "  If the target account is an administrator on the CyberArk server, UAC must be disabled."
+            $Tasks += "  Please consider the risks carefully before enabling this connection component."
         }
 
     }
@@ -848,7 +853,7 @@ if ($MmcAppsTest) {
         $null = Install-WindowsFeature $WindowsFeatures
     }
     catch {
-        Write-LogMessage -type Error -MSG "Error installing Remote Server Administration Tools. Please resolve try again."
+        Write-LogMessage -type Error -MSG "Error installing Remote Server Administration Tools. Please resolve and try again."
         exit 1
     }
 
@@ -871,12 +876,8 @@ if ($MmcAppsTest) {
             }
         }
     }
-
-    If ("GPMC" -in $Application) {
-        $Tasks += "Note: To support Group Policy Management:"
-        $Tasks += "  The target account must have the `"Allow Log on Locally`" user right."
-        $Tasks += "  If the target account is an administrator on the CyberArk server, UAC must be disabled."
-        $Tasks += "  Please consider the risks carefully before enabling this connection component."
+    else {
+        Write-LogMessage -type Info -MSG "Installer user credentials not provided; skipping connection component creation"
     }
 }
 
