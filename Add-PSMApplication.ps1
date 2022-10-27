@@ -1000,8 +1000,8 @@ switch ($Application) {
     "GoogleChromeX86" {
         If (Test-Path "C:\Program Files\Google\Chrome\Application\chrome.exe") {
             Write-LogMessage -type Error -MSG "Chrome exists at `"C:\Program Files\Google\Chrome\Application\chrome.exe`""
-            Write-LogMessage -type Error -MSG "which is the 64-bit installation path. Please uninstall it and run script again, or"
-            Write-LogMessage -type Error -MSG "run the script with -Application GoogleChromeX64 instead"
+            Write-LogMessage -type Error -MSG "which is the 64-bit installation path. Please uninstall it and run script again if you"
+            Write-LogMessage -type Error -MSG "want to switch to the 32-bit version "
             exit 1
         }
         If (Test-Path "C:\Program Files (x86)\Google\Chrome\Application\chrome.exe") {
@@ -1035,8 +1035,8 @@ switch ($Application) {
         Write-LogMessage -type Info -MSG "Checking if Chrome 32 bit is present"
         If (Test-Path "C:\Program Files (x86)\Google\Chrome\Application\chrome.exe") {
             Write-LogMessage -type Error -MSG "Chrome exists at `"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe`""
-            Write-LogMessage -type Error -MSG "which is the 32-bit installation path. Please uninstall it and run script again, or"
-            Write-LogMessage -type Error -MSG "run the script with -Application GoogleChromeX86 instead"
+            Write-LogMessage -type Error -MSG "which is the 32-bit installation path. Please uninstall it and run script again if you"
+            Write-LogMessage -type Error -MSG "want to switch to the 64-bit version "
             exit 1
         }
         If (Test-Path "C:\Program Files (x86)\Google\Chrome\Application\chrome.exe") {
