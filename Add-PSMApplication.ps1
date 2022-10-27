@@ -1060,6 +1060,77 @@ switch ($Application) {
         )
         Add-PSMConfigureAppLockerSection -SectionName "Google Chrome" -XmlDoc ([REF]$xml) -AppLockerEntries $AppLockerEntries
     }
+
+    # Microsoft Edge 64 bit
+    "MicrosoftEdgeX64" {
+        Write-LogMessage -type Info -MSG "Checking if Microsoft Edge 32 bit is present"
+        If (Test-Path "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe") {
+            Write-LogMessage -type Error -MSG "Microsoft Edge exists at `"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe`""
+            Write-LogMessage -type Error -MSG "which is the 32-bit installation path. Please uninstall it and run script again if you"
+            Write-LogMessage -type Error -MSG "want to switch to the 64-bit version "
+            exit 1
+        }
+        If (Test-Path "C:\Program Files\Microsoft\Edge\Application\msedge.exe") {
+            Write-LogMessage -type Info -MSG "Microsoft Edge appears to be installed already. Will not reinstall."
+        }
+        else {
+            $DownloadUrl = "http://go.microsoft.com/fwlink/?LinkID=2093437"
+            $OutFile = "$env:temp\MicrosoftEdgeStandaloneEnterprise64.msi"
+            Write-LogMessage -type Info -MSG "Downloading and installing Microsoft Edge"
+            $null = Install-GoogleChrome -DownloadUrl $DownloadUrl -OutFile $OutFile
+        }
+        $WebAppSupport = Test-PSMWebAppSupport -psmRootInstallLocation $PSMInstallationFolder
+        If ($WebAppSupport) {
+            Write-LogMessage -type Verbose -MSG "Web app support already enabled. Not modifying PSMHardening.ps1"
+        }
+        else {
+            Write-LogMessage -type Info "Enabling web app support in PSMHardening script"
+            Enable-PSMWebAppSupport -psmRootInstallLocation $PSMInstallationFolder -BackupFile $BackupHardeningXmlFilePath
+            $RunHardening = $true
+        }
+        $Path = "C:\Program Files\Google\Chrome\Application\chrome.exe"
+
+        $AppLockerEntries = @(
+            (New-PSMApplicationElement -Xml $xml -EntryType Application -Name MicrosoftEdge -FileType Exe -Path $Path -Method Publisher)
+        )
+        Add-PSMConfigureAppLockerSection -SectionName "Microsoft Edge" -XmlDoc ([REF]$xml) -AppLockerEntries $AppLockerEntries
+    }
+
+    # Microsoft Edge 32 bit
+    "MicrosoftEdgeX86" {
+        Write-LogMessage -type Info -MSG "Checking if Microsoft Edge 64 bit is present"
+        If (Test-Path "C:\Program Files\Microsoft\Edge\Application\msedge.exe") {
+            Write-LogMessage -type Error -MSG "Microsoft Edge exists at `"C:\Program Files\Microsoft\Edge\Application\msedge.exe`""
+            Write-LogMessage -type Error -MSG "which is the 64-bit installation path. Please uninstall it and run script again if you"
+            Write-LogMessage -type Error -MSG "want to switch to the 32-bit version "
+            exit 1
+        }
+        If (Test-Path "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe") {
+            Write-LogMessage -type Info -MSG "Microsoft Edge appears to be installed already. Will not reinstall."
+        }
+        else {
+            $DownloadUrl = "http://go.microsoft.com/fwlink/?LinkID=2093505"
+            $OutFile = "$env:temp\GoogleChromeStandaloneEnterprise64.msi"
+            Write-LogMessage -type Info -MSG "Downloading and installing Microsoft Edge"
+            $null = Install-GoogleChrome -DownloadUrl $DownloadUrl -OutFile $OutFile
+        }
+        $WebAppSupport = Test-PSMWebAppSupport -psmRootInstallLocation $PSMInstallationFolder
+        If ($WebAppSupport) {
+            Write-LogMessage -type Verbose -MSG "Web app support already enabled. Not modifying PSMHardening.ps1"
+        }
+        else {
+            Write-LogMessage -type Info "Enabling web app support in PSMHardening script"
+            Enable-PSMWebAppSupport -psmRootInstallLocation $PSMInstallationFolder -BackupFile $BackupHardeningXmlFilePath
+            $RunHardening = $true
+        }
+        $Path = "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
+    
+        $AppLockerEntries = @(
+                (New-PSMApplicationElement -Xml $xml -EntryType Application -Name MicrosoftEdge -FileType Exe -Path $Path -Method Publisher)
+        )
+        Add-PSMConfigureAppLockerSection -SectionName "Microsoft Edge" -XmlDoc ([REF]$xml) -AppLockerEntries $AppLockerEntries
+    }
+    
 }
 
 try { Copy-Item -Force $AppLockerXmlFilePath $BackupAppLockerXmlFilePath }
