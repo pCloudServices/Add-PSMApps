@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param (
     [Parameter(Mandatory = $true)]
-    [ValidateSet("GoogleChromeX86", "GoogleChromeX64", "SqlMgmtStudio18", "GenericMMC", "TOTPToken", "ADUC", "DNS", "DHCP", "ADDT", "ADSS", "GPMC")]
+    [ValidateSet("MicrosoftEdgeX86","MicrosoftEdgeX86","GoogleChromeX86", "GoogleChromeX64", "SqlMgmtStudio18", "GenericMMC", "TOTPToken", "ADUC", "DNS", "DHCP", "ADDT", "ADSS", "GPMC")]
     [string[]]
     $Application,
     [Parameter(Mandatory = $false)]
