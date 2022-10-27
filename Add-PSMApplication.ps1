@@ -442,8 +442,8 @@ function Install-Chromium {
     Invoke-WebRequest $DownloadUrl -OutFile $OutFile
     $ProgressPreference = "Continue"
     Write-LogMessage -type Verbose -MSG "Installing $Type"
-    $ChromeInstallResult = Start-Process -Wait msiexec.exe -ArgumentList "/qb!", "/i", $OutFile -PassThru 
-    If ($ChromeInstallResult.ExitCode -ne 0) {
+    $ChromiumInstallResult = Start-Process -Wait msiexec.exe -ArgumentList "/qb!", "/i", $OutFile -PassThru 
+    If ($ChromiumInstallResult.ExitCode -ne 0) {
         Write-LogMessage -type Error -MSG "$Type installation failed. Please resolve the issue or install $Type manually and try again."
         Write-LogMessage -type Error -MSG "The $Type installation MSI is located at $OutFile"
         exit 1
