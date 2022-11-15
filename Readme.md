@@ -27,7 +27,8 @@ Add-PSMApplication will prompt for these if not provided on the command line
 | HTML5     | Default, OnByDefault, OffByDefault | Control the creation of an AllowSelectHTML5 user parameter, and its default Value  |
 | PortalUrl | Privilege Cloud portal address     | The address of the Privilege Cloud web portal.                                     |
 
-If `-HTML5` is omitted, or set to Default, the AllowSelectHTML5 user parameter will not be created.  
+If `-HTML5` is omitted, or set to Default, the AllowSelectHTML5 user parameter will not be created.
+
 `PortalUrl` Will be detected automatically in most environments.
 
 ## Applications
@@ -72,9 +73,14 @@ Any instances of `{address}` in ClientInstallationPath will be replaced with the
   - ComponentName - the internal ID of the connection component
   - ComponentDisplayName - the name that will be displayed to users
 - Supports the following additional parameters
-  - SupportGPMC - Runs MMC as the target user, instead of just using the target user for network connections
-    The target user must have the right to log on locally
-    If the target user is an administrator on the CyberArk Privilege Cloud Connector servers, UAC must be disabled on the server
+  - SupportGPMC - Runs MMC as the target user, instead of just using the target user for network connections  
+    - The target user must have the right to log on locally
+    - If the target user is an administrator on the CyberArk Privilege Cloud Connector servers, UAC must be disabled on the server
+
+#### Microsoft Edge
+- Downloads and installs Microsoft Edge
+- Adds Edge to AppLocker configuration
+- Enables web application support
 
 #### Google Chrome
 - Downloads and installs Google Chrome
