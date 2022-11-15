@@ -79,11 +79,6 @@ Any instances of `{address}` in ClientInstallationPath will be replaced with the
     - The target user must have the right to log on locally
     - If the target user is an administrator on the CyberArk Privilege Cloud Connector servers, UAC must be disabled on the server
 
-#### Microsoft Edge
-- Downloads and installs Microsoft Edge
-- Adds Edge to AppLocker configuration
-- Enables web application support
-
 #### Google Chrome
 - Downloads and installs Google Chrome
 - Adds Google Chrome to AppLocker configuration
