@@ -749,63 +749,72 @@ Function Get-RequiredDriverVersion {
 
 Function Update-BrowserDrivers {
     param (
-    [Parameter(Mandatory = $True)]
-    [string]
-    [ValidateSet("Chrome", "Edge")]
-    $Application,    
-    [Parameter(Mandatory = $True)]
-    [string]
-    $DriverOutputPath,    
-    [Parameter(Mandatory = $false)]
-    [Switch]
-    $ForceDownload
-)
+        [Parameter(Mandatory = $True)]
+        [string]
+        [ValidateSet("Chrome", "Edge")]
+        $Application,    
+        [Parameter(Mandatory = $True)]
+        [string]
+        $DriverOutputPath,    
+        [Parameter(Mandatory = $false)]
+        [Switch]
+        $ForceDownload
+    )
 
-$ProgressPreference = "SilentlyContinue" # https://github.com/PowerShell/PowerShell/issues/13414
+    $ProgressPreference = "SilentlyContinue" # https://github.com/PowerShell/PowerShell/issues/13414
 
     $RequiredDriverVersion = Get-RequiredDriverVersion -Application $Application
-Switch ($Application) {
-    "Chrome" {
+    Switch ($Application) {
+        "Chrome" {
             $DriverVersion = (Invoke-WebRequest "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$RequiredDriverVersion").Content
-        $DriverUri = "https://chromedriver.storage.googleapis.com/$DriverVersion/chromedriver_win32.zip"
-        $DriverFilename = "chromedriver.exe"
+            $DriverUri = "https://chromedriver.storage.googleapis.com/$DriverVersion/chromedriver_win32.zip"
+            $DriverFilename = "chromedriver.exe"
             $ExistingDriverVersion = & $DriverOutputPath --version
             $ExistingDriverVersion = $ExistingDriverVersion.Split(" ")[1]
-    }
-    "Edge" {
+        }
+        "Edge" {
             $RequiredDriverVersion = $AppVersion
             $DriverUri = "https://msedgedriver.azureedge.net/$RequiredDriverVersion/edgedriver_win32.zip"
-        $DriverFilename = "msedgedriver.exe"
+            $DriverFilename = "msedgedriver.exe"
             $ExistingDriverVersion = & $DriverOutputPath --version
             $ExistingDriverVersion = $ExistingDriverVersion.Split(" ")[3]
         }
     }
     If (($ForceDownload -eq $False) -and (Test-path $DriverOutputPath)) {
-            Write-Output "Driver version $ExistingDriverVersion found on machine"
-            If ($DriverVersion -eq $ExistingDriverVersion) {
-                Write-Output "Web Driver on machine is already latest version. Skipping."
-                Write-Output "Use -ForceDownload to reinstall regardless"
-                Exit
-            }
+        Write-Output "Driver version $ExistingDriverVersion found on machine"
+        If ($DriverVersion -eq $ExistingDriverVersion) {
+            Write-Output "Web Driver on machine is already latest version. Skipping."
+            Write-Output "Use -ForceDownload to reinstall regardless"
+            Exit
         }
+    }
 
 
-$TempFilePath = [System.IO.Path]::GetTempFileName()
-$TempZipFilePath = $TempFilePath.Replace(".tmp", ".zip")
-Rename-Item -Path $TempFilePath -NewName $TempZipFilePath
-$TempFileUnzipPath = $TempFilePath.Replace(".tmp", "")
+    $TempFilePath = [System.IO.Path]::GetTempFileName()
+    $TempZipFilePath = $TempFilePath.Replace(".tmp", ".zip")
+    Rename-Item -Path $TempFilePath -NewName $TempZipFilePath
+    $TempFileUnzipPath = $TempFilePath.Replace(".tmp", "")
 
     Invoke-WebRequest $DriverUri -OutFile $TempZipFilePath
-Expand-Archive $TempZipFilePath -DestinationPath $TempFileUnzipPath
-Move-Item "$TempFileUnzipPath/$DriverFilename" -Destination $DriverOutputPath -Force
+    Expand-Archive $TempZipFilePath -DestinationPath $TempFileUnzipPath
+    Move-Item "$TempFileUnzipPath/$DriverFilename" -Destination $DriverOutputPath -Force
 
-# Clean up temp files
-Remove-Item $TempZipFilePath
-Remove-Item $TempFileUnzipPath -Recurse
+    # Clean up temp files
+    Remove-Item $TempZipFilePath
+    Remove-Item $TempFileUnzipPath -Recurse
 
 }
 
 # Script start
+
+# Privilege Cloud connection details will be requested only if configuration includes importing a CC
+$ListApplicationsWithConnectionComponents = "GenericMMC", "TOTPToken", "ADUC", "DNS", "DHCP", "ADDT", "ADSS", "GPMC"
+
+# The MMC console files will be installed only if an MMC component is included
+$ListMmcApps = "ADSS", "ADDT", "ADUC", "DHCP", "DNS", "GPMC"
+
+# Web App support will be enabled and browser drivers considered for update only if a browser is included
+$ListBrowsers = "GoogleChromeX86", "GoogleChromeX64", "MicrosoftEdgeX86", "MicrosoftEdgeX64"
 
 $global:InVerbose = $PSBoundParameters.Verbose.IsPresent
 $ScriptLocation = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -831,45 +840,41 @@ $RunHardening = $false
 # Load the current XML
 $xml = New-Object System.Xml.XmlDocument
 #$xml.PreserveWhitespace = $true
-$xml.Load("$PSMInstallationFolder\Hardening\PSMConfigureAppLocker.xml")
+try {
+    $xml.Load("$PSMInstallationFolder\Hardening\PSMConfigureAppLocker.xml")
+}
+catch {
+    Write-LogMessage -type Error -MSG "Failed to load PSMConfigureAppLocker.xml as an XML file"
+    exit 1
+
+}
 
 If (!($PortalUrl)) {
     $PortalUrl = Get-PvwaAddress -psmRootInstallLocation $PSMInstallationFolder
 }
 $Tasks = @()
 
-# Only prompt for admin credentials if we need to import connection components.
+# Check whether any of the requested applications include CCs that need to be imported and log in if so
+$AppsWithConnectionComponentsTest = $Application | Where-Object { $ListApplicationsWithConnectionComponents -contains $_ }
 
-$ListApplicationsWithoutConnectionComponents = "GoogleChromeX86", "GoogleChromeX64", "SqlMgmtStudio18", "MicrosoftEdgeX86", "MicrosoftEdgeX64"
-$ListApplicationsWithConnectionComponents = "GenericMMC", "TOTPToken", "ADUC", "DNS", "DHCP", "ADDT", "ADSS", "GPMC"
-
-# Identify components for which drivers are relevant
-$Browsers = "GoogleChromeX86", "GoogleChromeX64", "MicrosoftEdgeX86", "MicrosoftEdgeX64"
-
-switch ($Application) {
-    { $PSItem -in $ListApplicationsWithConnectionComponents } {
-        $tinaCreds = Get-Credential -Message "Please enter CyberArk credentials to import connection components or cancel to skip." 
-        if ($tinaCreds) {
-            Write-LogMessage -type Verbose -MSG "Logging in to CyberArk"
-            $pvwaToken = New-ConnectionToRestAPI -pvwaAddress $PortalUrl -tinaCreds $tinaCreds
-            if (Test-PvwaToken -Token $pvwaToken -pvwaAddress $PortalUrl) {
-                Write-LogMessage -type Verbose -MSG "Successfully logged in"
-                $Tasks += "Add the newly created connection components to any domain platforms."
-            }
-            else {
-                Write-LogMessage -type Verbose -MSG "Error logging in to CyberArk"
-                exit 1
-            }
+if ($AppsWithConnectionComponentsTest) {
+    $tinaCreds = Get-Credential -Message "Please enter CyberArk credentials to import connection components or cancel to skip." 
+    if ($tinaCreds) {
+        Write-LogMessage -type Verbose -MSG "Logging in to CyberArk"
+        $pvwaToken = New-ConnectionToRestAPI -pvwaAddress $PortalUrl -tinaCreds $tinaCreds
+        if (Test-PvwaToken -Token $pvwaToken -pvwaAddress $PortalUrl) {
+            Write-LogMessage -type Verbose -MSG "Successfully logged in"
+            $Tasks += "Add the newly created connection components to any domain platforms."
         }
         else {
-            Write-LogMessage -type Warning -MSG "No credentials provided. Will not import connection components."
+            Write-LogMessage -type Verbose -MSG "Error logging in to CyberArk"
+            exit 1
         }
-        # Break out of the switch. No need to evaluate other items in $Application. If there's at least one we need to get credentials.
-        break
+    }
+    else {
+        Write-LogMessage -type Warning -MSG "No credentials provided. Will not import connection components."
     }
 }
-
-$ListMmcApps = "ADSS", "ADDT", "ADUC", "DHCP", "DNS", "GPMC"
 
 # Check whether any of the requested applications are MMC-based, by checking for intersections between the $Applications array and an array of the MMC-based applications
 # If any are present, we'll install the dipatcher, MSC Files, and install the required Windows Features
@@ -1251,45 +1256,47 @@ if ($TestBrowsersPresent) {
         $RunHardening = $true
     }
 
-# Browser drivers
-If ($UpdateBrowserDrivers) {
-    $UpdateDriverArguments = @()
-    If ("CPM" -in $UpdateBrowserDrivers) {
-        $CPMPath = Get-CPMDirectory
-        If ("GoogleChromeX86" -in $Application -or "GoogleChromeX64" -in $Application) {
-            $UpdateDriverArguments += [PSCustomObject]@{
-                DriverOutputPath = $CPMPath + "\bin\chromedriver.exe"
-                Application      = "Chrome"
+    # Browser drivers
+    If ($UpdateBrowserDrivers) {
+        $UpdateDriverArguments = @()
+        If ("CPM" -in $UpdateBrowserDrivers) {
+            $CPMPath = Get-CPMDirectory
+            If ("GoogleChromeX86" -in $Application -or "GoogleChromeX64" -in $Application) {
+                $UpdateDriverArguments += [PSCustomObject]@{
+                    DriverOutputPath = $CPMPath + "\bin\chromedriver.exe"
+                    Application      = "Chrome"
+                }
+            }
+            If ("MicrosoftEdgeX86" -in $Application -or "MicrosoftEdgeX64" -in $Application) {
+                $UpdateDriverArguments += [PSCustomObject]@{
+                    DriverOutputPath = $CPMPath + "\bin\chromedriver.exe"
+                    Application      = "Edge"
+                }
             }
         }
-        If ("MicrosoftEdgeX86" -in $Application -or "MicrosoftEdgeX64" -in $Application) {
-            $UpdateDriverArguments += [PSCustomObject]@{
-                DriverOutputPath = $CPMPath + "\bin\chromedriver.exe"
-                Application      = "Edge"
+        If ("PSM" -in $UpdateBrowserDrivers) {
+            If ("GoogleChromeX86" -in $Application -or "GoogleChromeX64" -in $Application) {
+                $UpdateDriverArguments += [PSCustomObject]@{
+                    DriverOutputPath = $PSMInstallationFolder + "\components\chromedriver.exe"
+                    Application      = "Chrome"
+                }
+            }
+            If ("MicrosoftEdgeX86" -in $Application -or "MicrosoftEdgeX64" -in $Application) {
+                $UpdateDriverArguments += [PSCustomObject]@{
+                    DriverOutputPath = $PSMInstallationFolder + "\components\chromedriver.exe"
+                    Application      = "Edge"
+                }
             }
         }
-    }
-    If ("PSM" -in $UpdateBrowserDrivers) {
-        If ("GoogleChromeX86" -in $Application -or "GoogleChromeX64" -in $Application) {
-            $UpdateDriverArguments += [PSCustomObject]@{
-                DriverOutputPath = $PSMInstallationFolder + "\components\chromedriver.exe"
-                Application      = "Chrome"
-            }
-        }
-        If ("MicrosoftEdgeX86" -in $Application -or "MicrosoftEdgeX64" -in $Application) {
-            $UpdateDriverArguments += [PSCustomObject]@{
-                DriverOutputPath = $PSMInstallationFolder + "\components\chromedriver.exe"
-                Application      = "Edge"
-            }
-        }
-    }
-    $UpdateDriverArguments | ForEach-Object {
-        Update-BrowserDrivers @_
+        $UpdateDriverArguments | ForEach-Object {
+            Update-BrowserDrivers @_
         }
     }
 }
 
-try { Copy-Item -Force $AppLockerXmlFilePath $BackupAppLockerXmlFilePath }
+try { 
+    Copy-Item -Force $AppLockerXmlFilePath $BackupAppLockerXmlFilePath 
+}
 catch { 
     Write-LogMessage -type Error -MSG "Backup of current PSMConfigureAppLocker.xml failed. Aborting."
     exit 1
