@@ -538,14 +538,9 @@ Function Enable-PSMWebAppSupport {
     #>
     param (
         [Parameter(Mandatory = $true)]
-        $psmRootInstallLocation,
-        [Parameter(Mandatory = $true)]
-        $BackupFile
+        $psmRootInstallLocation
     )
     try {
-        Copy-Item -Path "$psmRootInstallLocation\Hardening\PSMHardening.ps1" -Destination $BackupFile -Force
-        #PSMHardening
-        #-------------------------
         $psmHardeningContent = Get-Content -Path $psmRootInstallLocation\Hardening\PSMHardening.ps1
 
         $newPsmHardeningContent = $psmHardeningContent -replace '^(\$SUPPORT_WEB_APPLICATIONS\s*=) .*', '$1 $true'
@@ -811,11 +806,10 @@ $global:HTML5 = $HTML5
 
 $CurrentDirectory = (Get-Location).Path
 $PSMInstallationFolder = Get-PSMDirectory
-$BackupSuffix = (Get-Date).ToString('yyyMMdd-HHmmss')
+$BackupStamp = (Get-Date).ToString('yyyMMdd-HHmmss')
 
 $AppLockerXmlFilePath = "$PSMInstallationFolder\Hardening\PSMConfigureAppLocker.xml"
-$BackupAppLockerXmlFilePath = "$PSMInstallationFolder\Hardening\PSMConfigureAppLocker.$BackupSuffix.bkp"
-$BackupHardeningXmlFilePath = "$PSMInstallationFolder\Hardening\PSMHardening.$BackupSuffix.bkp"
+$BackupAppLockerXmlFilePath = "$PSMInstallationFolder\Backup\Add-PSMApps\$BackupStamp\PSMConfigureAppLocker.xml"
 
 if ($AppLockerXmlFilePath) {
     if (-not (Test-Path -Path $AppLockerXmlFilePath)) {
@@ -1122,15 +1116,6 @@ switch ($Application) {
             Write-LogMessage -type Info -MSG "Downloading and installing Chrome"
             $null = Install-Chromium -Type "Google Chrome" -DownloadUrl $DownloadUrl -OutFile $OutFile
         }
-        $WebAppSupport = Test-PSMWebAppSupport -psmRootInstallLocation $PSMInstallationFolder
-        If ($WebAppSupport) {
-            Write-LogMessage -type Info -MSG "Web app support already enabled. Not modifying PSMHardening.ps1"
-        }
-        else {
-            Write-LogMessage -type Info "Enabling web app support in PSMHardening script"
-            Enable-PSMWebAppSupport -psmRootInstallLocation $PSMInstallationFolder -BackupFile $BackupHardeningXmlFilePath
-            $RunHardening = $true
-        }
 
         $Path = "C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"
 
@@ -1156,15 +1141,6 @@ switch ($Application) {
             $OutFile = "$env:temp\GoogleChromeStandaloneEnterprise64.msi"
             Write-LogMessage -type Info -MSG "Downloading and installing Chrome"
             $null = Install-Chromium -Type "Google Chrome" -DownloadUrl $DownloadUrl -OutFile $OutFile
-        }
-        $WebAppSupport = Test-PSMWebAppSupport -psmRootInstallLocation $PSMInstallationFolder
-        If ($WebAppSupport) {
-            Write-LogMessage -type Verbose -MSG "Web app support already enabled. Not modifying PSMHardening.ps1"
-        }
-        else {
-            Write-LogMessage -type Info "Enabling web app support in PSMHardening script"
-            Enable-PSMWebAppSupport -psmRootInstallLocation $PSMInstallationFolder -BackupFile $BackupHardeningXmlFilePath
-            $RunHardening = $true
         }
         $Path = "C:\Program Files\Google\Chrome\Application\chrome.exe"
 
@@ -1192,15 +1168,6 @@ switch ($Application) {
             Write-LogMessage -type Info -MSG "Downloading and installing Microsoft Edge"
             $null = Install-Chromium -Type "Microsoft Edge" -DownloadUrl $DownloadUrl -OutFile $OutFile
         }
-        $WebAppSupport = Test-PSMWebAppSupport -psmRootInstallLocation $PSMInstallationFolder
-        If ($WebAppSupport) {
-            Write-LogMessage -type Verbose -MSG "Web app support already enabled. Not modifying PSMHardening.ps1"
-        }
-        else {
-            Write-LogMessage -type Info "Enabling web app support in PSMHardening script"
-            Enable-PSMWebAppSupport -psmRootInstallLocation $PSMInstallationFolder -BackupFile $BackupHardeningXmlFilePath
-            $RunHardening = $true
-        }
         $Path = "C:\Program Files\Microsoft\Edge\Application\msedge.exe"
 
         $AppLockerEntries = @(
@@ -1227,15 +1194,6 @@ switch ($Application) {
             Write-LogMessage -type Info -MSG "Downloading and installing Microsoft Edge"
             $null = Install-Chromium -Type "Microsoft Edge" -DownloadUrl $DownloadUrl -OutFile $OutFile
         }
-        $WebAppSupport = Test-PSMWebAppSupport -psmRootInstallLocation $PSMInstallationFolder
-        If ($WebAppSupport) {
-            Write-LogMessage -type Verbose -MSG "Web app support already enabled. Not modifying PSMHardening.ps1"
-        }
-        else {
-            Write-LogMessage -type Info "Enabling web app support in PSMHardening script"
-            Enable-PSMWebAppSupport -psmRootInstallLocation $PSMInstallationFolder -BackupFile $BackupHardeningXmlFilePath
-            $RunHardening = $true
-        }
         $EdgePath = "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
         $EdgeDriverPath = "$PSMInstallationFolder\Components\msedgedriver.exe"
     
@@ -1247,8 +1205,45 @@ switch ($Application) {
     }
 }
 
-# Browser drivers
+# Browser-specific operations
+# Check whether any of the requested applications are browsers, by checking for intersections between the $Applications array and an array of browsers
+$TestBrowsersPresent = $Application | Where-Object { $ListBrowsers -contains $_ }
+if ($TestBrowsersPresent) {
+    # Test and enable Web App support
+    $WebAppSupport = Test-PSMWebAppSupport -psmRootInstallLocation $PSMInstallationFolder
+    If ($WebAppSupport) {
+        Write-LogMessage -type Verbose -MSG "Web app support already enabled. Not modifying PSMHardening.ps1"
+    }
+    else {
+        Write-LogMessage -type Verbose "Web app support not yet enabled"
+        Write-LogMessage -type Verbose "Backing up PSM Hardening script"
+        $BackupPath = "$PSMInstallationFolder\Backup\Add-PSMApps\$BackupStamp"
+        try {
+            If (!(Test-Path -Path $PSMInstallationFolder\Backup\$BackupStamp -PathType Container)) {
+                New-Item -ItemType Directory -Path $BackupPath
+            }
+            $PSMHardeningBackupFileName = ("{0}\PSMHardening.ps1" -f $BackupPath)
+    
+            Copy-Item -path "$PSMInstallationFolder\Hardening\PSMHardening.ps1" -Destination $PSMHardeningBackupFileName
+    
+            If (!(Test-Path $PSMHardeningBackupFileName)) {
+                Write-LogMessage -Type Error -MSG "Failed to backup PSMHardening.ps1" -ErrorAction Stop
+            }
+        }
+        catch {
+            Write-LogMessage -type Error -MSG $_
+            Write-LogMessage -type Error -MSG "Could not back up PSM Hardening script. Exiting."
+            exit 1
+        }
+        Write-LogMessage -type Verbose "Backed up PSM Hardening script"
+        Write-LogMessage -type Verbose "Enabling web app support in PSMHardening script"
+        Enable-PSMWebAppSupport -psmRootInstallLocation $PSMInstallationFolder
+        Write-LogMessage -type Info "Enabled web app support in PSMHardening script"
 
+        $RunHardening = $true
+    }
+
+# Browser drivers
 If ($UpdateBrowserDrivers) {
     $UpdateDriverArguments = @()
     If ("CPM" -in $UpdateBrowserDrivers) {
@@ -1282,6 +1277,7 @@ If ($UpdateBrowserDrivers) {
     }
     $UpdateDriverArguments | ForEach-Object {
         Update-BrowserDrivers @_
+        }
     }
 }
 
