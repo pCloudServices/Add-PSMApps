@@ -712,6 +712,41 @@ Function Test-PSMWebAppSupport {
     }
 }
 
+Function Get-RequiredDriverVersion {
+    param (
+        [Parameter(Mandatory = $True)]
+        [string]
+        [ValidateSet("Chrome", "Edge")]
+        $Application
+    )
+    Switch ($Application) {
+        "Chrome" {
+            Try {
+                $AppVersion = (Get-Item (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe' -ErrorAction Stop).'(Default)').VersionInfo.FileVersion
+            }
+            Catch {
+                Write-Error "Google Chrome not found in registry"
+                return $null
+            }
+            Write-LogMessage -type Info -MSG "$Application version $AppVersion found on machine"
+            #   Chrome driver versions are same as browser driver version, but with the last part removed
+            $AppVersion = $AppVersion.Substring(0, $AppVersion.LastIndexOf("."))
+            return $AppVersion
+        }
+        "Edge" {
+            Try {
+                $AppVersion = (Get-Item (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe' -ErrorAction Stop).'(Default)').VersionInfo.FileVersion
+            }
+            Catch {
+                Write-LogMessage -type Warning -MSG "Microsoft Edge not found in registry. Driver will not be updated."
+                return $null
+            }
+            return $AppVersion
+        }
+    }
+
+}
+
 Function Update-BrowserDrivers {
     param (
     [Parameter(Mandatory = $True)]
@@ -728,47 +763,24 @@ Function Update-BrowserDrivers {
 
 $ProgressPreference = "SilentlyContinue" # https://github.com/PowerShell/PowerShell/issues/13414
 
+    $RequiredDriverVersion = Get-RequiredDriverVersion -Application $Application
 Switch ($Application) {
     "Chrome" {
-        Try {
-            $AppVersion = (Get-Item (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe' -ErrorAction Stop).'(Default)').VersionInfo.FileVersion
-        }
-        Catch {
-            Write-Error "Google Chrome not found in registry"
-            exit 1
-        }
-        Write-LogMessage -type Info -MSG "$Application version $AppVersion found on machine"
-        #   Chrome driver versions are same as browser driver version, but with the last part removed
-        $AppVersion = $AppVersion.Substring(0, $AppVersion.LastIndexOf("."))
-        #   and append the result to URL "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_". 
-        $DriverVersion = (Invoke-WebRequest "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$AppVersion").Content
+            $DriverVersion = (Invoke-WebRequest "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$RequiredDriverVersion").Content
         $DriverUri = "https://chromedriver.storage.googleapis.com/$DriverVersion/chromedriver_win32.zip"
         $DriverFilename = "chromedriver.exe"
-        If (($ForceDownload -eq $False) -and (Test-path $DriverOutputPath)) {
             $ExistingDriverVersion = & $DriverOutputPath --version
             $ExistingDriverVersion = $ExistingDriverVersion.Split(" ")[1]
-            Write-Output "Driver version $ExistingDriverVersion found on machine"
-            If ($DriverVersion -eq $ExistingDriverVersion) {
-                Write-Output "Web Driver on machine is already latest version. Skipping."
-                Write-Output "Use -ForceDownload to reinstall regardless"
-                Exit
-            }
-        }
     }
     "Edge" {
-        Try {
-            $AppVersion = (Get-Item (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe' -ErrorAction Stop).'(Default)').VersionInfo.FileVersion
-        }
-        Catch {
-            Write-LogMessage -type Warning -MSG "Microsoft Edge not found in registry. Driver will not be updated."
-        }
-        Write-Output "$Application version $AppVersion found on machine"
-        $DriverVersion = $AppVersion
-        $DriverUri = "https://msedgedriver.azureedge.net/$DriverVersion/edgedriver_win32.zip"
+            $RequiredDriverVersion = $AppVersion
+            $DriverUri = "https://msedgedriver.azureedge.net/$RequiredDriverVersion/edgedriver_win32.zip"
         $DriverFilename = "msedgedriver.exe"
-        If (($ForceDownload -eq $False) -and (Test-path $DriverOutputPath)) {
             $ExistingDriverVersion = & $DriverOutputPath --version
             $ExistingDriverVersion = $ExistingDriverVersion.Split(" ")[3]
+        }
+    }
+    If (($ForceDownload -eq $False) -and (Test-path $DriverOutputPath)) {
             Write-Output "Driver version $ExistingDriverVersion found on machine"
             If ($DriverVersion -eq $ExistingDriverVersion) {
                 Write-Output "Web Driver on machine is already latest version. Skipping."
@@ -776,8 +788,6 @@ Switch ($Application) {
                 Exit
             }
         }
-    }
-}
 
 
 $TempFilePath = [System.IO.Path]::GetTempFileName()
@@ -785,11 +795,9 @@ $TempZipFilePath = $TempFilePath.Replace(".tmp", ".zip")
 Rename-Item -Path $TempFilePath -NewName $TempZipFilePath
 $TempFileUnzipPath = $TempFilePath.Replace(".tmp", "")
 
-Invoke-WebRequest $DriverUrl -OutFile $TempZipFilePath
+    Invoke-WebRequest $DriverUri -OutFile $TempZipFilePath
 Expand-Archive $TempZipFilePath -DestinationPath $TempFileUnzipPath
 Move-Item "$TempFileUnzipPath/$DriverFilename" -Destination $DriverOutputPath -Force
-
-#   After the initial download, it is recommended that you occasionally go through the above process again to see if there are any bug fix releases.
 
 # Clean up temp files
 Remove-Item $TempZipFilePath
