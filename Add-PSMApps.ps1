@@ -711,6 +711,31 @@ Function Test-PSMWebAppSupport {
     }
 }
 
+
+Function Get-CurrentDriverVersion {
+    param (
+        [Parameter(Mandatory = $True)]
+        [string]
+        $DriverFile
+    )
+    try {
+        $DriverVersionString = & $DriverFile --version
+    }
+    catch {
+        return $null
+    }
+    # e.g. ChromeDriver 107.0.5304.62 (1eec40d3a5764881c92085aaee66d25075c159aa-refs/branch-heads/5304@{#942})
+    # e.g. Microsoft Edge WebDriver 105.0.1343.25 (d3a25e9da89eba5d55f1ab48fced0ccd321e4ba8)
+    $DriverVersionArray = $DriverVersionString -split " "
+    If ($DriverVersionString -like "Microsoft Edge WebDriver *") {
+        return $DriverVersionArray[3]
+    }
+    ElseIf ($DriverVersionString -like "ChromeDriver *") {
+        return $DriverVersionArray[1]
+    }
+    return $false
+}
+
 Function Get-RequiredDriverMajorVersion {
     param (
         [Parameter(Mandatory = $True)]
@@ -724,38 +749,59 @@ Function Get-RequiredDriverMajorVersion {
                 $AppVersion = (Get-Item (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe' -ErrorAction Stop).'(Default)').VersionInfo.FileVersion
             }
             Catch {
-                Write-Error "Google Chrome not found in registry"
                 return $null
             }
             Write-LogMessage -type Verbose -MSG "$Browser version $AppVersion found on machine"
             #   Chrome driver versions are same as browser driver version, but with the last part removed
             $AppVersion = $AppVersion.Substring(0, $AppVersion.LastIndexOf("."))
-            return $AppVersion
         }
         "Edge" {
             Try {
                 $AppVersion = (Get-Item (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe' -ErrorAction Stop).'(Default)').VersionInfo.FileVersion
             }
             Catch {
-                Write-LogMessage -type Warning -MSG "Microsoft Edge not found in registry. Driver will not be updated."
                 return $null
             }
-            return $AppVersion.Exception.Message
         }
     }
-
+    return $AppVersion
 }
 
-Function Update-BrowserDrivers {
+
+Function Get-RequiredDriverExactVersion {
     param (
         [Parameter(Mandatory = $True)]
         [string]
         [ValidateSet("Chrome", "Edge")]
-        $Browser,    
-
+        $Browser,
+        
         [Parameter(Mandatory = $True)]
         [string]
-        $DriverOutputPath,
+        $RequiredMajorVersion
+
+    )
+
+    Switch ($Browser) {
+        "Chrome" {
+            try {
+                return (Invoke-WebRequest "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$RequiredDriverVersion").Content
+            }
+            catch {
+                return $false
+            }
+        }
+        "Edge" {
+            return $RequiredMajorVersion
+        }
+    }
+}
+
+Function Get-BrowserDriverUri {
+    param (
+        [Parameter(Mandatory = $True)]
+        [string]
+        [ValidateSet("Chrome", "Edge")]
+        $Browser,
         
         [Parameter(Mandatory = $True)]
         [string]
@@ -763,66 +809,39 @@ Function Update-BrowserDrivers {
 
     )
 
-    $ProgressPreference = "SilentlyContinue" # https://github.com/PowerShell/PowerShell/issues/13414
-
     Switch ($Browser) {
         "Chrome" {
-            $RequiredDriverVersion = (Invoke-WebRequest "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$RequiredDriverVersion").Content
-            $DriverUri = "https://chromedriver.storage.googleapis.com/$RequiredDriverVersion/chromedriver_win32.zip"
-            $DriverFilename = "chromedriver.exe"
+            return "https://chromedriver.storage.googleapis.com/$RequiredDriverVersion/chromedriver_win32.zip"
         }
         "Edge" {
-            $DriverUri = "https://msedgedriver.azureedge.net/$RequiredDriverVersion/edgedriver_win32.zip"
-            $DriverFilename = "msedgedriver.exe"
+            return "https://msedgedriver.azureedge.net/$RequiredDriverVersion/edgedriver_win32.zip"
         }
     }
-    If (Test-path $DriverOutputPath) {
-        try {
-            Switch ($Browser) {
-                "Chrome" {
-                    $ExistingDriverVersion = & $DriverOutputPath --version
-                    $ExistingDriverVersion = $ExistingDriverVersion.Split(" ")[1]
-                }
-                "Edge" {
-                    $ExistingDriverVersion = & $DriverOutputPath --version
-                    $ExistingDriverVersion = $ExistingDriverVersion.Split(" ")[3]
-                }
-            }
-        }
-        catch {
-            Write-LogMessage -type Error -MSG "Error checking the current version of the browser driver at $DriverOutputPath"
-            Write-LogMessage -type Error -MSG "Please check it is a valid file and update manually or delete and rerun the script"
-            exit 1
-        }
-    
-        If ($ExistingDriverVersion) {
-            Write-LogMessage -type Verbose -MSG "Driver version $ExistingDriverVersion found on machine"
-            If ($RequiredDriverVersion -eq $ExistingDriverVersion) {
-                Write-LogMessage -type Verbose -MSG "Web Driver on machine already matches browser version. Skipping."
-                return "AlreadyUpToDate"
-            }
-        }
-    }
+}
 
+Function Get-BrowserDriverFileAndReturnPath {
+    param (
+        [Parameter(Mandatory = $True)]
+        [string]
+        $DriverUri
+    )
 
     try {
         $TempFilePath = [System.IO.Path]::GetTempFileName()
         $TempZipFilePath = $TempFilePath.Replace(".tmp", ".zip")
         Rename-Item -Path $TempFilePath -NewName $TempZipFilePath
         $TempFileUnzipPath = $TempFilePath.Replace(".tmp", "")
-
+        
+        $ProgressPreference = "SilentlyContinue" # https://github.com/PowerShell/PowerShell/issues/13414
         Invoke-WebRequest $DriverUri -OutFile $TempZipFilePath
+        $ProgressPreference = "Continue"
         Expand-Archive $TempZipFilePath -DestinationPath $TempFileUnzipPath
-        Move-Item "$TempFileUnzipPath/$DriverFilename" -Destination $DriverOutputPath -Force
 
-        # Clean up temp files
-        Remove-Item $TempZipFilePath
-        Remove-Item $TempFileUnzipPath -Recurse
-        return "Updated"
     } 
     catch {
-        return $_
+        return $false    
     }
+    return "$TempFileUnzipPath"
 }
 
 # Script start
@@ -835,6 +854,10 @@ $ListMmcApps = "ADSS", "ADDT", "ADUC", "DHCP", "DNS", "GPMC"
 
 # Web App support will be enabled and browser drivers considered for update only if a browser is included
 $ListBrowsers = "GoogleChromeX86", "GoogleChromeX64", "MicrosoftEdgeX86", "MicrosoftEdgeX64"
+
+# Use for identifying when browser drivers need to be updated
+$ListEdge = "MicrosoftEdgeX86", "MicrosoftEdgeX64"
+$ListChrome = "GoogleChromeX86", "GoogleChromeX64"
 
 $global:InVerbose = $PSBoundParameters.Verbose.IsPresent
 $ScriptLocation = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -1287,63 +1310,65 @@ if ($TestBrowsersPresent) {
 
     # Browser drivers
     If ($UpdateBrowserDrivers) {
-        $UpdateDriverArguments = @()
         If ("CPM" -in $UpdateBrowserDrivers) {
             $CPMPath = Get-CPMDirectory
             If (!($CPMPath)) {
-                Write-LogMessage -type Error -MSG "CPM Path could not be determined. Please rerun script without requesting CPM browser driver update."
+                Write-LogMessage -type Error -MSG "CPM path could not be determined. Please rerun script without requesting CPM browser driver update."
                 exit 1
             }
-            If ("GoogleChromeX86" -in $Application -or "GoogleChromeX64" -in $Application) {
-                $UpdateDriverArguments += [PSCustomObject]@{
-                    Component        = "CPM"
-                    DriverOutputPath = ("{0}\bin\chromedriver.exe" -f $CPMPath)
-                    Browser          = "Chrome"
-                }
-            }
-            If ("MicrosoftEdgeX86" -in $Application -or "MicrosoftEdgeX64" -in $Application) {
-                $UpdateDriverArguments += [PSCustomObject]@{
-                    Component        = "CPM"
-                    DriverOutputPath = ($CPMPath + "\bin\msedgedriver.exe")
-                    Browser          = "Edge"
-                }
-            }
         }
-        If ("PSM" -in $UpdateBrowserDrivers) {
-            If ("GoogleChromeX86" -in $Application -or "GoogleChromeX64" -in $Application) {
-                $UpdateDriverArguments += [PSCustomObject]@{
-                    Component        = "PSM"
-                    DriverOutputPath = ($PSMInstallationFolder + "\components\chromedriver.exe")
-                    Browser          = "Chrome"
-                }
-            }
-            If ("MicrosoftEdgeX86" -in $Application -or "MicrosoftEdgeX64" -in $Application) {
-                $UpdateDriverArguments += [PSCustomObject]@{
-                    Component        = "PSM"
-                    DriverOutputPath = ($PSMInstallationFolder + "\components\msedgedriver.exe")
-                    Browser          = "Edge"
-                }
-            }
+        $TestChromePresent = $Application | Where-Object { $ListChrome -contains $_ }
+        $TestEdgePresent = $Application | Where-Object { $ListEdge -contains $_ }
+        $RequestedBrowsers = @()
+        if ($TestChromePresent) {
+            $RequestedBrowsers += "Chrome"
         }
-        $UpdateDriverArguments | ForEach-Object {
-            $Browser = $_.Browser
-            $Component = $_.Component
-            $DriverOutputPath = $_.DriverOutputPath
-            
-            $RequiredDriverVersion = Get-RequiredDriverMajorVersion -Browser $Browser
-
-            $Result = Update-BrowserDrivers -Browser $Browser -DriverOutputPath $DriverOutputPath -RequiredDriverVersion $RequiredDriverVersion
-
-            Switch ($Result) {
-                "Updated" {
-                    Write-LogMessage -type Info -MSG ("Updated {0} web driver for {1}" -f $Browser, $Component)
+        if ($TestEdgePresent) {
+            $RequestedBrowsers += "Edge"
+        }
+        foreach ($CurrentBrowser in $RequestedBrowsers) {
+            Switch ($CurrentBrowser) {
+                "Chrome" {
+                    $BrowserDriverFileName = "chromedriver.exe"
                 }
-                "AlreadyUpToDate" {
-                    Write-LogMessage -type Info -MSG ("{0} driver in {1} already up to date" -f $Browser, $Component)
+                "Edge" {
+                    $BrowserDriverFileName = "msedgedriver.exe"
                 }
-                Default {
-                    Write-LogMessage -type Error -MSG "Encountered an error attempting to update drivers"
-                    Write-LogMessage -type Error -MSG $_
+            }
+            $DriverPaths = @()
+            $RequiredDriverVersion = Get-RequiredDriverMajorVersion -Browser $CurrentBrowser
+            $RequiredDriverVersion = Get-RequiredDriverExactVersion -Browser $CurrentBrowser -RequiredMajorVersion $RequiredDriverVersion
+                
+            If ("CPM" -in $UpdateBrowserDrivers) {
+                $DriverPaths += ("{0}\bin\$BrowserDriverFileName" -f $CPMPath)
+            }
+            If ("PSM" -in $UpdateBrowserDrivers) {
+                $DriverPaths += ($PSMInstallationFolder + "\components\$BrowserDriverFileName")
+            }
+            $DriverPaths | ForEach-Object {
+                $CurrentDriverPath = $_
+                $CurrentDriverVersion = Get-CurrentDriverVersion -DriverFile $CurrentDriverPath
+                $BrowserDriverUri = Get-BrowserDriverUri -Browser $CurrentBrowser -RequiredDriverVersion $RequiredDriverVersion
+                $DriversToUpdate = @()
+                If ($CurrentDriverVersion -ne $RequiredDriverVersion) {
+                    $DriversToUpdate += $CurrentDriverPath
+                }
+                If ($DriversToUpdate) {
+                    $BrowserNewDriverPath = Get-BrowserDriverFileAndReturnPath -DriverUri $BrowserDriverUri
+                    foreach ($Driver in $DriversToUpdate) {
+                        try {
+                            Copy-Item -Force -Path $BrowserNewDriverPath\$BrowserDriverFileName -Destination $Driver
+                            Write-LogMessage -type Info -MSG "Updated $CurrentBrowser driver at $CurrentDriverPath to version $RequiredDriverVersion"
+                        }
+                        catch {
+                            Write-LogMessage -type Error -MSG "Failed to update Edge driver. Please check permissions on"
+                            Write-LogMessage -type Error -MSG "$Driver"
+                            exit 1
+                        }
+                    }
+                }
+                else {
+                    Write-LogMessage -type Info -MSG "$CurrentBrowser driver at $CurrentDriverPath matches browser version"
                 }
             }
         }
