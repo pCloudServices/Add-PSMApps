@@ -65,9 +65,11 @@ Any instances of `{address}` in ClientInstallationPath will be replaced with the
 
 When installing Chrome or Edge the following additional parameter may be provided
 
-| Setting              | Valid values | Description                                                                                     |
-| -------------------- | ------------ | ----------------------------------------------------------------------------------------------- |
-| UpdateBrowserDrivers | CPM, PSM     | Update the drivers for the browsers selected for installation for the components specified here |
+| Setting              | Valid values | Description                            |
+| -------------------- | ------------ | -------------------------------------- |
+| UpdateBrowserDrivers | CPM, PSM     | Update browser drivers used by PSM/CPM |
+
+CPM and PSM use Chrome or Edge drivers to interact with websites automatically. Depending on the versions of various components on the Connector server, these drivers may need to be kept in sync with the installed version of the browser. This option will automatically install the latest version of the driver that matches the installed version of the browser.
 
 ### Per-component information
 
