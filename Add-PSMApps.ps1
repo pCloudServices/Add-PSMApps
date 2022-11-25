@@ -205,8 +205,7 @@ Function Get-PvwaAddress {
         return $Address
     }
     catch {
-        Write-Host "Unable to detect PVWA address automatically. Please rerun script and provide it using the -PvwaAddress parameter."
-        exit 1
+        return $false
     }
 }
 
@@ -874,6 +873,14 @@ catch {
 If (!($PortalUrl)) {
     $PortalUrl = Get-PvwaAddress -psmRootInstallLocation $PSMInstallationFolder
 }
+
+# Check PortalUrl again. If still undefined, error out
+
+If (!($PortalUrl)) {
+    Write-LogMessage -type Error -MSG "Unable to detect PVWA address automatically. Please rerun script and provide it using the -PvwaAddress parameter."
+    exit 1
+}
+
 $Tasks = @()
 
 # Check whether any of the requested applications include CCs that need to be imported and log in if so
