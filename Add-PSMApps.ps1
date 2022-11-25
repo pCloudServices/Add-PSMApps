@@ -32,7 +32,7 @@ param (
 
     [Parameter(Mandatory = $false)]
     [ValidateSet("CPM", "PSM")]
-    [string]
+    [string[]]
     $UpdateBrowserDrivers
     
 )
@@ -395,7 +395,7 @@ function Get-PSMDirectory() {
 function Get-CPMDirectory {
     Try {
         $Service = Get-CimInstance -ClassName Win32_Service | Where-Object name -eq "CyberArk Password Manager"
-        $Path = $Service.PathName -replace "`"", "" -replace " /SERVICE", "" -replace "\PMEngine.exe", ""
+        $Path = $Service.PathName -replace "`"", "" -replace " /SERVICE", "" -replace "\\PMEngine.exe", ""
     }
     Catch {
         return $false
@@ -712,14 +712,14 @@ Function Test-PSMWebAppSupport {
     }
 }
 
-Function Get-RequiredDriverVersion {
+Function Get-RequiredDriverMajorVersion {
     param (
         [Parameter(Mandatory = $True)]
         [string]
         [ValidateSet("Chrome", "Edge")]
-        $Application
+        $Browser
     )
-    Switch ($Application) {
+    Switch ($Browser) {
         "Chrome" {
             Try {
                 $AppVersion = (Get-Item (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe' -ErrorAction Stop).'(Default)').VersionInfo.FileVersion
@@ -728,7 +728,7 @@ Function Get-RequiredDriverVersion {
                 Write-Error "Google Chrome not found in registry"
                 return $null
             }
-            Write-LogMessage -type Info -MSG "$Application version $AppVersion found on machine"
+            Write-LogMessage -type Verbose -MSG "$Browser version $AppVersion found on machine"
             #   Chrome driver versions are same as browser driver version, but with the last part removed
             $AppVersion = $AppVersion.Substring(0, $AppVersion.LastIndexOf("."))
             return $AppVersion
@@ -741,7 +741,7 @@ Function Get-RequiredDriverVersion {
                 Write-LogMessage -type Warning -MSG "Microsoft Edge not found in registry. Driver will not be updated."
                 return $null
             }
-            return $AppVersion
+            return $AppVersion.Exception.Message
         }
     }
 
@@ -752,57 +752,78 @@ Function Update-BrowserDrivers {
         [Parameter(Mandatory = $True)]
         [string]
         [ValidateSet("Chrome", "Edge")]
-        $Application,    
+        $Browser,    
+
         [Parameter(Mandatory = $True)]
         [string]
-        $DriverOutputPath,    
-        [Parameter(Mandatory = $false)]
-        [Switch]
-        $ForceDownload
+        $DriverOutputPath,
+        
+        [Parameter(Mandatory = $True)]
+        [string]
+        $RequiredDriverVersion
+
     )
 
     $ProgressPreference = "SilentlyContinue" # https://github.com/PowerShell/PowerShell/issues/13414
 
-    $RequiredDriverVersion = Get-RequiredDriverVersion -Application $Application
-    Switch ($Application) {
+    Switch ($Browser) {
         "Chrome" {
-            $DriverVersion = (Invoke-WebRequest "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$RequiredDriverVersion").Content
-            $DriverUri = "https://chromedriver.storage.googleapis.com/$DriverVersion/chromedriver_win32.zip"
+            $RequiredDriverVersion = (Invoke-WebRequest "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$RequiredDriverVersion").Content
+            $DriverUri = "https://chromedriver.storage.googleapis.com/$RequiredDriverVersion/chromedriver_win32.zip"
             $DriverFilename = "chromedriver.exe"
-            $ExistingDriverVersion = & $DriverOutputPath --version
-            $ExistingDriverVersion = $ExistingDriverVersion.Split(" ")[1]
         }
         "Edge" {
-            $RequiredDriverVersion = $AppVersion
             $DriverUri = "https://msedgedriver.azureedge.net/$RequiredDriverVersion/edgedriver_win32.zip"
             $DriverFilename = "msedgedriver.exe"
-            $ExistingDriverVersion = & $DriverOutputPath --version
-            $ExistingDriverVersion = $ExistingDriverVersion.Split(" ")[3]
         }
     }
-    If (($ForceDownload -eq $False) -and (Test-path $DriverOutputPath)) {
-        Write-Output "Driver version $ExistingDriverVersion found on machine"
-        If ($DriverVersion -eq $ExistingDriverVersion) {
-            Write-Output "Web Driver on machine is already latest version. Skipping."
-            Write-Output "Use -ForceDownload to reinstall regardless"
-            Exit
+    If (Test-path $DriverOutputPath) {
+        try {
+            Switch ($Browser) {
+                "Chrome" {
+                    $ExistingDriverVersion = & $DriverOutputPath --version
+                    $ExistingDriverVersion = $ExistingDriverVersion.Split(" ")[1]
+                }
+                "Edge" {
+                    $ExistingDriverVersion = & $DriverOutputPath --version
+                    $ExistingDriverVersion = $ExistingDriverVersion.Split(" ")[3]
+                }
+            }
+        }
+        catch {
+            Write-LogMessage -type Error -MSG "Error checking the current version of the browser driver at $DriverOutputPath"
+            Write-LogMessage -type Error -MSG "Please check it is a valid file and update manually or delete and rerun the script"
+            exit 1
+        }
+    
+        If ($ExistingDriverVersion) {
+            Write-LogMessage -type Verbose -MSG "Driver version $ExistingDriverVersion found on machine"
+            If ($RequiredDriverVersion -eq $ExistingDriverVersion) {
+                Write-LogMessage -type Verbose -MSG "Web Driver on machine already matches browser version. Skipping."
+                return "AlreadyUpToDate"
+            }
         }
     }
 
 
-    $TempFilePath = [System.IO.Path]::GetTempFileName()
-    $TempZipFilePath = $TempFilePath.Replace(".tmp", ".zip")
-    Rename-Item -Path $TempFilePath -NewName $TempZipFilePath
-    $TempFileUnzipPath = $TempFilePath.Replace(".tmp", "")
+    try {
+        $TempFilePath = [System.IO.Path]::GetTempFileName()
+        $TempZipFilePath = $TempFilePath.Replace(".tmp", ".zip")
+        Rename-Item -Path $TempFilePath -NewName $TempZipFilePath
+        $TempFileUnzipPath = $TempFilePath.Replace(".tmp", "")
 
-    Invoke-WebRequest $DriverUri -OutFile $TempZipFilePath
-    Expand-Archive $TempZipFilePath -DestinationPath $TempFileUnzipPath
-    Move-Item "$TempFileUnzipPath/$DriverFilename" -Destination $DriverOutputPath -Force
+        Invoke-WebRequest $DriverUri -OutFile $TempZipFilePath
+        Expand-Archive $TempZipFilePath -DestinationPath $TempFileUnzipPath
+        Move-Item "$TempFileUnzipPath/$DriverFilename" -Destination $DriverOutputPath -Force
 
-    # Clean up temp files
-    Remove-Item $TempZipFilePath
-    Remove-Item $TempFileUnzipPath -Recurse
-
+        # Clean up temp files
+        Remove-Item $TempZipFilePath
+        Remove-Item $TempFileUnzipPath -Recurse
+        return "Updated"
+    } 
+    catch {
+        return $_
+    }
 }
 
 # Script start
@@ -827,6 +848,7 @@ $BackupStamp = (Get-Date).ToString('yyyMMdd-HHmmss')
 
 $AppLockerXmlFilePath = "$PSMInstallationFolder\Hardening\PSMConfigureAppLocker.xml"
 $BackupAppLockerXmlFilePath = "$PSMInstallationFolder\Backup\Add-PSMApps\$BackupStamp\PSMConfigureAppLocker.xml"
+$BackupPath = "$PSMInstallationFolder\Backup\Add-PSMApps\$BackupStamp"
 
 if ($AppLockerXmlFilePath) {
     if (-not (Test-Path -Path $AppLockerXmlFilePath)) {
@@ -1114,6 +1136,7 @@ switch ($Application) {
     }
     # Google Chrome 32 bit
     "GoogleChromeX86" {
+        Write-LogMessage -type Verbose -MSG "Checking if Chrome 64 bit is present"
         If (Test-Path "C:\Program Files\Google\Chrome\Application\chrome.exe") {
             Write-LogMessage -type Error -MSG "Chrome exists at `"C:\Program Files\Google\Chrome\Application\chrome.exe`""
             Write-LogMessage -type Error -MSG "which is the 64-bit installation path. Please uninstall it and run script again if you"
@@ -1139,14 +1162,14 @@ switch ($Application) {
     }
     # Google Chrome 64 bit
     "GoogleChromeX64" {
-        Write-LogMessage -type Info -MSG "Checking if Chrome 32 bit is present"
+        Write-LogMessage -type Verbose -MSG "Checking if Chrome 32 bit is present"
         If (Test-Path "C:\Program Files (x86)\Google\Chrome\Application\chrome.exe") {
             Write-LogMessage -type Error -MSG "Chrome exists at `"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe`""
             Write-LogMessage -type Error -MSG "which is the 32-bit installation path. Please uninstall it and run script again if you"
             Write-LogMessage -type Error -MSG "want to switch to the 64-bit version "
             exit 1
         }
-        If (Test-Path "C:\Program Files (x86)\Google\Chrome\Application\chrome.exe") {
+        If (Test-Path "C:\Program Files\Google\Chrome\Application\chrome.exe") {
             Write-LogMessage -type Info -MSG "Chrome appears to be installed already. Will not reinstall."
         }
         else {
@@ -1165,7 +1188,7 @@ switch ($Application) {
 
     # Microsoft Edge 64 bit
     "MicrosoftEdgeX64" {
-        Write-LogMessage -type Info -MSG "Checking if Microsoft Edge 32 bit is present"
+        Write-LogMessage -type Verbose -MSG "Checking if Microsoft Edge 32 bit is present"
         If (Test-Path "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe") {
             Write-LogMessage -type Error -MSG "Microsoft Edge exists at `"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe`""
             Write-LogMessage -type Error -MSG "which is the 32-bit installation path. Please uninstall it and run script again if you"
@@ -1191,7 +1214,7 @@ switch ($Application) {
 
     # Microsoft Edge 32 bit
     "MicrosoftEdgeX86" {
-        Write-LogMessage -type Info -MSG "Checking if Microsoft Edge 64 bit is present"
+        Write-LogMessage -type Verbose -MSG "Checking if Microsoft Edge 64 bit is present"
         If (Test-Path "C:\Program Files\Microsoft\Edge\Application\msedge.exe") {
             Write-LogMessage -type Error -MSG "Microsoft Edge exists at `"C:\Program Files\Microsoft\Edge\Application\msedge.exe`""
             Write-LogMessage -type Error -MSG "which is the 64-bit installation path. Please uninstall it and run script again if you"
@@ -1230,13 +1253,12 @@ if ($TestBrowsersPresent) {
     else {
         Write-LogMessage -type Verbose "Web app support not yet enabled"
         Write-LogMessage -type Verbose "Backing up PSM Hardening script"
-        $BackupPath = "$PSMInstallationFolder\Backup\Add-PSMApps\$BackupStamp"
         try {
             If (!(Test-Path -Path $PSMInstallationFolder\Backup\$BackupStamp -PathType Container)) {
-                New-Item -ItemType Directory -Path $BackupPath
+                $null = New-Item -ItemType Directory -Path $BackupPath
             }
             $PSMHardeningBackupFileName = ("{0}\PSMHardening.ps1" -f $BackupPath)
-    
+
             Copy-Item -path "$PSMInstallationFolder\Hardening\PSMHardening.ps1" -Destination $PSMHardeningBackupFileName
     
             If (!(Test-Path $PSMHardeningBackupFileName)) {
@@ -1261,41 +1283,85 @@ if ($TestBrowsersPresent) {
         $UpdateDriverArguments = @()
         If ("CPM" -in $UpdateBrowserDrivers) {
             $CPMPath = Get-CPMDirectory
+            If (!($CPMPath)) {
+                Write-LogMessage -type Error -MSG "CPM Path could not be determined. Please rerun script without requesting CPM browser driver update."
+                exit 1
+            }
             If ("GoogleChromeX86" -in $Application -or "GoogleChromeX64" -in $Application) {
                 $UpdateDriverArguments += [PSCustomObject]@{
-                    DriverOutputPath = $CPMPath + "\bin\chromedriver.exe"
-                    Application      = "Chrome"
+                    Component        = "CPM"
+                    DriverOutputPath = ("{0}\bin\chromedriver.exe" -f $CPMPath)
+                    Browser          = "Chrome"
                 }
             }
             If ("MicrosoftEdgeX86" -in $Application -or "MicrosoftEdgeX64" -in $Application) {
                 $UpdateDriverArguments += [PSCustomObject]@{
-                    DriverOutputPath = $CPMPath + "\bin\chromedriver.exe"
-                    Application      = "Edge"
+                    Component        = "CPM"
+                    DriverOutputPath = ($CPMPath + "\bin\msedgedriver.exe")
+                    Browser          = "Edge"
                 }
             }
         }
         If ("PSM" -in $UpdateBrowserDrivers) {
             If ("GoogleChromeX86" -in $Application -or "GoogleChromeX64" -in $Application) {
                 $UpdateDriverArguments += [PSCustomObject]@{
-                    DriverOutputPath = $PSMInstallationFolder + "\components\chromedriver.exe"
-                    Application      = "Chrome"
+                    Component        = "PSM"
+                    DriverOutputPath = ($PSMInstallationFolder + "\components\chromedriver.exe")
+                    Browser          = "Chrome"
                 }
             }
             If ("MicrosoftEdgeX86" -in $Application -or "MicrosoftEdgeX64" -in $Application) {
                 $UpdateDriverArguments += [PSCustomObject]@{
-                    DriverOutputPath = $PSMInstallationFolder + "\components\chromedriver.exe"
-                    Application      = "Edge"
+                    Component        = "PSM"
+                    DriverOutputPath = ($PSMInstallationFolder + "\components\msedgedriver.exe")
+                    Browser          = "Edge"
                 }
             }
         }
         $UpdateDriverArguments | ForEach-Object {
-            Update-BrowserDrivers @_
+            $Browser = $_.Browser
+            $Component = $_.Component
+            $DriverOutputPath = $_.DriverOutputPath
+            
+            $RequiredDriverVersion = Get-RequiredDriverMajorVersion -Browser $Browser
+
+            $Result = Update-BrowserDrivers -Browser $Browser -DriverOutputPath $DriverOutputPath -RequiredDriverVersion $RequiredDriverVersion
+
+            Switch ($Result) {
+                "Updated" {
+                    Write-LogMessage -type Info -MSG ("Updated {0} web driver for {1}" -f $Browser, $Component)
+                }
+                "AlreadyUpToDate" {
+                    Write-LogMessage -type Info -MSG ("{0} driver in {1} already up to date" -f $Browser, $Component)
+                }
+                Default {
+                    Write-LogMessage -type Error -MSG "Encountered an error attempting to update drivers"
+                    Write-LogMessage -type Error -MSG $_
+                }
+            }
         }
     }
 }
 
+try {
+    If (!(Test-Path -Path $PSMInstallationFolder\Backup\$BackupStamp -PathType Container)) {
+        $null = New-Item -ItemType Directory -Path $BackupPath
+    }
+    $PSMHardeningBackupFileName = ("{0}\PSMHardening.ps1" -f $BackupPath)
+    
+    Copy-Item -path "$PSMInstallationFolder\Hardening\PSMHardening.ps1" -Destination $PSMHardeningBackupFileName
+    
+    If (!(Test-Path $PSMHardeningBackupFileName)) {
+        Write-LogMessage -Type Error -MSG "Failed to backup PSMHardening.ps1" -ErrorAction Stop
+    }
+}
+catch {
+    Write-LogMessage -type Error -MSG $_
+    Write-LogMessage -type Error -MSG "Could not back up PSM Hardening script. Exiting."
+    exit 1
+}
 try { 
-    Copy-Item -Force $AppLockerXmlFilePath $BackupAppLockerXmlFilePath 
+    Copy-Item -Force $AppLockerXmlFilePath $BackupAppLockerXmlFilePath
 }
 catch { 
     Write-LogMessage -type Error -MSG "Backup of current PSMConfigureAppLocker.xml failed. Aborting."
