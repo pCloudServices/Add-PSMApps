@@ -97,7 +97,7 @@ Any instances of `{address}` in ClientInstallationPath will be replaced with the
 
 #### TOTPToken
 - Requires the component zip to be downloaded from the marketplace and placed in the same folder as Add-PSMApplication
-  - https://cyberark-customers.force.com/mplace/s/#a352J000000GPw5QAG-a392J000002hZX8QAM
+  - https://cyberark.my.site.com/mplace/s/#a352J000000GPw5QAG-a392J000002hZX8QAM
 - Adds required EXE and DLL files to AppLocker configuration
 - Imports Connection Component
 
