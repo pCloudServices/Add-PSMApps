@@ -1068,16 +1068,19 @@ switch ($Application) {
     # Microsoft Edge 64 bit
     "MicrosoftEdgeX64" {
         Write-LogMessage -type Info -MSG "Checking if Microsoft Edge 32 bit is present"
-        If (Test-Path "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe") {
-            Write-LogMessage -type Error -MSG "Microsoft Edge exists at `"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe`""
-            Write-LogMessage -type Error -MSG "which is the 32-bit installation path. Please uninstall it and run script again if you"
-            Write-LogMessage -type Error -MSG "want to switch to the 64-bit version "
+        $Packages = Get-Package | Where-Object TagId -eq "0E72E0CA-1196-3B77-9B71-9FE483875A84"
+        If ($Packages) {
+            Write-LogMessage -type Error -MSG "Microsoft Edge 32-bit is currently installed."
+            Write-LogMessage -type Error -MSG "Please uninstall it and run script again if you want to switch to the 64-bit version "
+            Write-LogMessage -type Error -MSG " or run the script with -Application MicrosoftEdgeX64 to configure the PSM server"
             exit 1
         }
-        If (Test-Path "C:\Program Files\Microsoft\Edge\Application\msedge.exe") {
+        Write-LogMessage -type Info -MSG "Checking if Microsoft Edge 64 bit is present"
+        If (Test-Path "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe") {
             Write-LogMessage -type Info -MSG "Microsoft Edge appears to be installed already. Will not reinstall."
         }
         else {
+            Write-LogMessage -type Info -MSG "Downloading and installing Microsoft Edge 64 bit"
             $DownloadUrl = "http://go.microsoft.com/fwlink/?LinkID=2093437"
             $OutFile = "$env:temp\MicrosoftEdgeStandaloneEnterprise64.msi"
             Write-LogMessage -type Info -MSG "Downloading and installing Microsoft Edge"
@@ -1092,7 +1095,7 @@ switch ($Application) {
             Enable-PSMWebAppSupport -psmRootInstallLocation $PSMInstallationFolder -BackupFile $BackupHardeningXmlFilePath
             $RunHardening = $true
         }
-        $Path = "C:\Program Files\Microsoft\Edge\Application\msedge.exe"
+        $Path = "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
 
         $AppLockerEntries = @(
             (New-PSMApplicationElement -Xml $xml -EntryType Application -Name MicrosoftEdge -FileType Exe -Path $Path -Method Publisher)
@@ -1103,16 +1106,19 @@ switch ($Application) {
     # Microsoft Edge 32 bit
     "MicrosoftEdgeX86" {
         Write-LogMessage -type Info -MSG "Checking if Microsoft Edge 64 bit is present"
-        If (Test-Path "C:\Program Files\Microsoft\Edge\Application\msedge.exe") {
-            Write-LogMessage -type Error -MSG "Microsoft Edge exists at `"C:\Program Files\Microsoft\Edge\Application\msedge.exe`""
-            Write-LogMessage -type Error -MSG "which is the 64-bit installation path. Please uninstall it and run script again if you"
-            Write-LogMessage -type Error -MSG "want to switch to the 32-bit version "
+        $Packages = Get-Package | Where-Object TagId -eq "DF6DD533-D7E9-3ECF-892D-62A737C8619D"
+        If ($Packages) {
+            Write-LogMessage -type Error -MSG "Microsoft Edge 64-bit is currently installed."
+            Write-LogMessage -type Error -MSG "Please uninstall it and run script again if you want to switch to the 64-bit version "
+            Write-LogMessage -type Error -MSG " or run the script with -Application MicrosoftEdgeX86 to configure the PSM server"
             exit 1
         }
+        Write-LogMessage -type Info -MSG "Checking if Microsoft Edge 32 bit is present"
         If (Test-Path "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe") {
             Write-LogMessage -type Info -MSG "Microsoft Edge appears to be installed already. Will not reinstall."
         }
         else {
+            Write-LogMessage -type Info -MSG "Downloading and installing Microsoft Edge 32 bit"
             $DownloadUrl = "http://go.microsoft.com/fwlink/?LinkID=2093505"
             $OutFile = "$env:temp\MicrosoftEdgeStandaloneEnterprise86.msi"
             Write-LogMessage -type Info -MSG "Downloading and installing Microsoft Edge"
