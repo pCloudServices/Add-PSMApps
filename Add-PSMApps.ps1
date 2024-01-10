@@ -716,6 +716,14 @@ if ($AppLockerXmlFilePath) {
     }
 }
 
+If ("GenericMMC" -in $Application) {
+    If ($False -eq ( ($ComponentName) -and ($ComponentDisplayName) -and ($MSCPath) )
+    ) {
+        Write-LogMessage -type Error -MSG "ComponentName, ComponentDisplayName and MscPath are mandatory for Generic MMC components"
+        exit 1
+    }
+}
+
 $RunHardening = $false
 
 # Load the current XML
@@ -887,14 +895,6 @@ if ($MmcAppsTest) {
 switch ($Application) {
     # Generic MMC connector
     "GenericMMC" {
-        If (
-            !(
-            ($ComponentName) -and ($ComponentDisplayName) -and ($MSCPath)
-            )
-        ) {
-            Write-LogMessage -type Error -MSG "ComponentName, ComponentDisplayName and MscPath are mandatory for Generic MMC components"
-            exit 1
-        }
         if ($tinaCreds) {
             $ComponentZipFile = "$CurrentDirectory\Supplemental\GenericMmc\ConnectionComponent.zip"
             $TargetComponentZipFile = $env:temp + "\CC-" + (Get-Date -UFormat '%Y%m%d%H%M%S') + ".zip"
