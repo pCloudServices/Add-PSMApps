@@ -1077,7 +1077,7 @@ switch ($Application) {
             Write-LogMessage -type Error -MSG " or run the script with -Application MicrosoftEdgeX64 to configure the PSM server"
             exit 1
         }
-        Write-LogMessage -type Info -MSG "Checking if Microsoft Edge 64 bit is present"
+        Write-LogMessage -type Info -MSG "Checking if Microsoft Edge is installed"
         If (Test-Path "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe") {
             Write-LogMessage -type Info -MSG "Microsoft Edge appears to be installed already. Will not reinstall."
         }
@@ -1115,7 +1115,7 @@ switch ($Application) {
             Write-LogMessage -type Error -MSG " or run the script with -Application MicrosoftEdgeX86 to configure the PSM server"
             exit 1
         }
-        Write-LogMessage -type Info -MSG "Checking if Microsoft Edge 32 bit is present"
+        Write-LogMessage -type Info -MSG "Checking if Microsoft Edge is installed"
         If (Test-Path "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe") {
             Write-LogMessage -type Info -MSG "Microsoft Edge appears to be installed already. Will not reinstall."
         }
