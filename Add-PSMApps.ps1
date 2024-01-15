@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param (
     [Parameter(Mandatory = $true)]
-    [ValidateSet("MicrosoftEdgeX86", "MicrosoftEdgeX64", "GoogleChromeX86", "GoogleChromeX64", "SqlMgmtStudio18", "GenericMMC", "TOTPToken", "ADUC", "DNS", "DHCP", "ADDT", "ADSS", "GPMC")]
+    [ValidateSet("MicrosoftEdgeX86", "MicrosoftEdgeX64", "GoogleChromeX86", "GoogleChromeX64", "SqlMgmtStudio18", "SqlMgmtStudio19", "GenericMMC", "TOTPToken", "ADUC", "DNS", "DHCP", "ADDT", "ADSS", "GPMC")]
     [string[]]
     $Application,
     [Parameter(Mandatory = $false)]
@@ -733,6 +733,13 @@ If ("SqlMgmtStudio18" -in $Application) {
     }
 }
 
+If ("SqlMgmtStudio19" -in $Application) {
+    If (!(Test-Path "C:\Program Files (x86)\Microsoft SQL Server Management Studio 19\Common7\IDE\Ssms.exe")) {
+        Write-LogMessage -type Error -MSG "SQL Management Studio 18 does not appear to be installed. Please install it first."
+        exit 1
+    }
+}
+
 $RunHardening = $false
 
 # Load the current XML
@@ -1002,6 +1009,23 @@ switch ($Application) {
             (New-PSMApplicationElement -Xml $xml -EntryType Libraries -Name SSMS18-Debugger -FileType Dll -Path "C:\Program Files (x86)\Microsoft SQL Server Management Studio 18\Common7\Packages\Debugger\*" -Method Path)
         )
         Add-PSMConfigureAppLockerSection -SectionName "SQL Management Studio 18 Libraries" -XmlDoc ([REF]$xml) -AppLockerEntries $AppLockerEntries -SectionType Libraries
+    }
+    "SqlMgmtStudio19" {
+        $AppLockerEntries = @(
+            (New-PSMApplicationElement -Xml $xml -EntryType Application -Name SSMS19 -FileType Exe -Path "C:\Program Files (x86)\Microsoft SQL Server Management Studio 19\Common7\IDE\Ssms.exe" -Method Publisher),
+            (New-PSMApplicationElement -Xml $xml -EntryType Application -Name SSMS19-DTAShell -FileType Exe -Path "C:\Program Files (x86)\Microsoft SQL Server Management Studio 19\Common7\DTASHELL.exe" -Method Publisher),
+            (New-PSMApplicationElement -Xml $xml -EntryType Application -Name SSMS19-Profiler -FileType Exe -Path "C:\Program Files (x86)\Microsoft SQL Server Management Studio 19\Common7\Profiler.exe" -Method Publisher)
+        )
+        Add-PSMConfigureAppLockerSection -SectionName "SQL Management Studio 19" -XmlDoc ([REF]$xml) -AppLockerEntries $AppLockerEntries
+        
+        $AppLockerEntries = @(
+            (New-PSMApplicationElement -Xml $xml -EntryType Libraries -Name SSMS19-Debugger -FileType Dll -Path "C:\Program Files (x86)\Microsoft SQL Server Management Studio 19\Common7\Packages\Debugger\*" -Method Path)
+        )
+        Add-PSMConfigureAppLockerSection -SectionName "SQL Management Studio 19 Libraries" -XmlDoc ([REF]$xml) -AppLockerEntries $AppLockerEntries -SectionType Libraries
+        $Tasks += "SqlMgmtStudio19:"
+        $Tasks += " - Create/Configure SQL Management Studio connection components"
+        $Tasks += " - - Adjust ClientInstallationPath"
+        $Tasks += " - - You may need to disable `"Lock Application Window`" to support SSMS19"
     }
     # Google Chrome 32 bit
     "GoogleChromeX86" {

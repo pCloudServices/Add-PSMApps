@@ -47,6 +47,7 @@ If `-HTML5` is omitted, or set to Default, the AllowSelectHTML5 user parameter w
 | GoogleChromeX86       | No                      | Google Chrome 32-bit                                    |
 | GoogleChromeX64       | No                      | Google Chrome 64-bit                                    |
 | SqlMgmtStudio18       | No                      | Microsoft SQL Management Studio 18                      |
+| SqlMgmtStudio19       | No                      | Microsoft SQL Management Studio 19                      |
 | TOTPToken             | No                      | CyberArk TOTP MFA Code Generator Connection Component   |
 
 See below for further information on operations performed for each component.
@@ -89,7 +90,7 @@ Any instances of `{address}` in ClientInstallationPath will be replaced with the
 - Adds Microsoft Edge to AppLocker configuration
 - Enables web application support
 
-#### Microsoft SQL Management Studio 18
+#### Microsoft SQL Management Studio 18/19
 - Adds required EXE and DLL files to AppLocker configuration
 - Does not install SSMS - this must be installed manually before running Add-PSMApplication
 - The required connection component already exists by default in Privilege Cloud for Windows Authentication
