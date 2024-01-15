@@ -938,9 +938,10 @@ switch ($Application) {
 
         Write-LogMessage -type Info -MSG "Installing Generic MMC dispatcher"
         Expand-Archive -Path "$CurrentDirectory\Supplemental\GenericMmc\Dispatcher.zip" -DestinationPath $PSMInstallationFolder\Components\ -Force
-
-        $Tasks += "Create $MSCPath"
-        $Tasks += "Add the `"$ComponentDisplayName`" connection component to applicable domain platforms"
+        
+        $Tasks += "GenericMMC:"
+        $Tasks += " - Create $MSCPath"
+        $Tasks += " - Add the `"$ComponentDisplayName`" connection component to applicable domain platforms"
     }
     "TOTPToken" {
         $ZipPath = "$CurrentDirectory\PSM-TOTPToken.zip"
