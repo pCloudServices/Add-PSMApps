@@ -726,6 +726,13 @@ If ("GenericMMC" -in $Application) {
     }
 }
 
+If ("SqlMgmtStudio18" -in $Application) {
+    If (!(Test-Path "C:\Program Files (x86)\Microsoft SQL Server Management Studio 18\Common7\IDE\Ssms.exe")) {
+        Write-LogMessage -type Error -MSG "SQL Management Studio 18 does not appear to be installed. Please install it first."
+        exit 1
+    }
+}
+
 $RunHardening = $false
 
 # Load the current XML
@@ -981,11 +988,6 @@ switch ($Application) {
         $Tasks += "Associate the TOTP Token connection component with an appropriate platform"
     }
     "SqlMgmtStudio18" {
-        If (!(Test-Path "C:\Program Files (x86)\Microsoft SQL Server Management Studio 18\Common7\IDE\Ssms.exe")) {
-            Write-LogMessage -type Error -MSG "SQL Management Studio 18 does not appear to be installed. Please install it first."
-            exit 1
-        }
-
         $AppLockerEntries = @(
             (New-PSMApplicationElement -Xml $xml -EntryType Application -Name SSMS18 -FileType Exe -Path "C:\Program Files (x86)\Microsoft SQL Server Management Studio 18\Common7\IDE\Ssms.exe" -Method Publisher),
             (New-PSMApplicationElement -Xml $xml -EntryType Application -Name SSMS18-DTAShell -FileType Exe -Path "C:\Program Files (x86)\Microsoft SQL Server Management Studio 18\Common7\DTASHELL.exe" -Method Publisher),
