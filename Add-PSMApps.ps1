@@ -747,7 +747,7 @@ $Tasks = @()
 
 # Only prompt for admin credentials if we need to import connection components.
 
-$ListApplicationsWithoutConnectionComponents = "GoogleChromeX86", "GoogleChromeX64", "SqlMgmtStudio18", "MicrosoftEdgeX86", "MicrosoftEdgeX64"
+$ListApplicationsWithoutConnectionComponents = "GoogleChromeX86", "GoogleChromeX64", "SqlMgmtStudio18", "SqlMgmtStudio19", "MicrosoftEdgeX86", "MicrosoftEdgeX64"
 
 switch ($Application) {
     { $PSItem -in $ListApplicationsWithoutConnectionComponents } {
@@ -861,10 +861,11 @@ if ($MmcAppsTest) {
                 MscFile     = "GPMC.msc"
                 GPMC        = $true
             }
-            $Tasks += "Note: To support Group Policy Management:"
-            $Tasks += "  The target account must have the `"Allow Log on Locally`" user right."
-            $Tasks += "  If the target account is an administrator on the CyberArk server, UAC must be disabled."
-            $Tasks += "  Please consider the risks carefully before enabling this connection component."
+            $Tasks += "Group Policy Management:"
+            $Tasks += " - Note: To support Group Policy Management:"
+            $Tasks += "   - The target account must have the `"Allow Log on Locally`" user right."
+            $Tasks += "   - If the target account is an administrator on the CyberArk server, UAC must be disabled."
+            $Tasks += "   - Please consider the risks carefully before enabling this connection component."
         }
 
     }
@@ -984,8 +985,9 @@ switch ($Application) {
             (New-PSMApplicationElement -Xml $xml -EntryType Application -Name PSM-TOTPToken -FileType Exe -Path "$PSMInstallationFolder\Components\TOTPToken.exe" -Method Hash -SessionType "*")
         )
         Add-PSMConfigureAppLockerSection -SectionName "PSM-TOTPToken" -XmlDoc ([REF]$xml) -AppLockerEntries $AppLockerEntries
-        $Tasks += "Import a platform supporting MFADeviceKeys-*.zip"
-        $Tasks += "Associate the TOTP Token connection component with an appropriate platform"
+        $Tasks += "TOTPToken:"
+        $Tasks += "- Import a platform supporting MFADeviceKeys-*.zip"
+        $Tasks += "- Associate the TOTP Token connection component with an appropriate platform"
     }
     "SqlMgmtStudio18" {
         $AppLockerEntries = @(
