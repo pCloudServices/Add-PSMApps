@@ -998,6 +998,7 @@ switch ($Application) {
         $Tasks += "- Associate the TOTP Token connection component with an appropriate platform"
     }
     "SqlMgmtStudio18" {
+        Write-LogMessage -type Info -MSG "SqlMgmtStudio18: Modifying AppLocker configuration"
         $AppLockerEntries = @(
             (New-PSMApplicationElement -Xml $xml -EntryType Application -Name SSMS18 -FileType Exe -Path "C:\Program Files (x86)\Microsoft SQL Server Management Studio 18\Common7\IDE\Ssms.exe" -Method Publisher),
             (New-PSMApplicationElement -Xml $xml -EntryType Application -Name SSMS18-DTAShell -FileType Exe -Path "C:\Program Files (x86)\Microsoft SQL Server Management Studio 18\Common7\DTASHELL.exe" -Method Publisher),
@@ -1014,6 +1015,7 @@ switch ($Application) {
         $Tasks += " - - Set ClientInstallationPath in your connection component to C:\Program Files (x86)\Microsoft SQL Server Management Studio 18\Common7\IDE\Ssms.exe"
     }
     "SqlMgmtStudio19" {
+        Write-LogMessage -type Info -MSG "SqlMgmtStudio19: Modifying AppLocker configuration"
         $AppLockerEntries = @(
             (New-PSMApplicationElement -Xml $xml -EntryType Application -Name SSMS19 -FileType Exe -Path "C:\Program Files (x86)\Microsoft SQL Server Management Studio 19\Common7\IDE\Ssms.exe" -Method Publisher),
             (New-PSMApplicationElement -Xml $xml -EntryType Application -Name SSMS19-DTAShell -FileType Exe -Path "C:\Program Files (x86)\Microsoft SQL Server Management Studio 19\Common7\DTASHELL.exe" -Method Publisher),
