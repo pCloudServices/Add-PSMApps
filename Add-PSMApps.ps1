@@ -1009,6 +1009,9 @@ switch ($Application) {
             (New-PSMApplicationElement -Xml $xml -EntryType Libraries -Name SSMS18-Debugger -FileType Dll -Path "C:\Program Files (x86)\Microsoft SQL Server Management Studio 18\Common7\Packages\Debugger\*" -Method Path)
         )
         Add-PSMConfigureAppLockerSection -SectionName "SQL Management Studio 18 Libraries" -XmlDoc ([REF]$xml) -AppLockerEntries $AppLockerEntries -SectionType Libraries
+        $Tasks += "SqlMgmtStudio18:"
+        $Tasks += " - Create/Configure SQL Management Studio connection components"
+        $Tasks += " - - Set ClientInstallationPath in your connection component to C:\Program Files (x86)\Microsoft SQL Server Management Studio 18\Common7\IDE\Ssms.exe"
     }
     "SqlMgmtStudio19" {
         $AppLockerEntries = @(
