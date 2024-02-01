@@ -1027,7 +1027,7 @@ switch ($Application) {
         Add-PSMConfigureAppLockerSection -SectionName "SQL Management Studio 19 Libraries" -XmlDoc ([REF]$xml) -AppLockerEntries $AppLockerEntries -SectionType Libraries
         $Tasks += "SqlMgmtStudio19:"
         $Tasks += " - Create/Configure SQL Management Studio connection components"
-        $Tasks += " - - Adjust ClientInstallationPath"
+        $Tasks += " - - Set ClientInstallationPath in your connection component to C:\Program Files (x86)\Microsoft SQL Server Management Studio 19\Common7\IDE\Ssms.exe"
         $Tasks += " - - You may need to disable `"Lock Application Window`" to support SSMS19"
     }
     # Google Chrome 32 bit
