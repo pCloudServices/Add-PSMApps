@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param (
     [Parameter(Mandatory = $true)]
-    [ValidateSet("MicrosoftEdgeX86", "MicrosoftEdgeX64", "GoogleChromeX86", "GoogleChromeX64", "SqlMgmtStudio18", "GenericMMC", "TOTPToken", "ADUC", "DNS", "DHCP", "ADDT", "ADSS", "GPMC")]
+    [ValidateSet("MicrosoftEdgeX86", "MicrosoftEdgeX64", "GoogleChromeX86", "GoogleChromeX64", "SqlMgmtStudio18", "SqlMgmtStudio19", "GenericMMC", "TOTPToken", "ADUC", "DNS", "DHCP", "ADDT", "ADSS", "GPMC")]
     [string[]]
     $Application,
     [Parameter(Mandatory = $false)]
@@ -24,6 +24,8 @@ param (
     [string]
     $PortalUrl
 )
+
+# Version: 1.0.2
 
 Function Add-PSMConfigureAppLockerSection {
     [CmdletBinding()]
@@ -716,6 +718,28 @@ if ($AppLockerXmlFilePath) {
     }
 }
 
+If ("GenericMMC" -in $Application) {
+    If ($False -eq ( ($ComponentName) -and ($ComponentDisplayName) -and ($MSCPath) )
+    ) {
+        Write-LogMessage -type Error -MSG "ComponentName, ComponentDisplayName and MscPath are mandatory for Generic MMC components"
+        exit 1
+    }
+}
+
+If ("SqlMgmtStudio18" -in $Application) {
+    If (!(Test-Path "C:\Program Files (x86)\Microsoft SQL Server Management Studio 18\Common7\IDE\Ssms.exe")) {
+        Write-LogMessage -type Error -MSG "SQL Management Studio 18 does not appear to be installed. Please install it first."
+        exit 1
+    }
+}
+
+If ("SqlMgmtStudio19" -in $Application) {
+    If (!(Test-Path "C:\Program Files (x86)\Microsoft SQL Server Management Studio 19\Common7\IDE\Ssms.exe")) {
+        Write-LogMessage -type Error -MSG "SQL Management Studio 18 does not appear to be installed. Please install it first."
+        exit 1
+    }
+}
+
 $RunHardening = $false
 
 # Load the current XML
@@ -730,7 +754,7 @@ $Tasks = @()
 
 # Only prompt for admin credentials if we need to import connection components.
 
-$ListApplicationsWithoutConnectionComponents = "GoogleChromeX86", "GoogleChromeX64", "SqlMgmtStudio18", "MicrosoftEdgeX86", "MicrosoftEdgeX64"
+$ListApplicationsWithoutConnectionComponents = "GoogleChromeX86", "GoogleChromeX64", "SqlMgmtStudio18", "SqlMgmtStudio19", "MicrosoftEdgeX86", "MicrosoftEdgeX64"
 
 switch ($Application) {
     { $PSItem -in $ListApplicationsWithoutConnectionComponents } {
@@ -844,10 +868,11 @@ if ($MmcAppsTest) {
                 MscFile     = "GPMC.msc"
                 GPMC        = $true
             }
-            $Tasks += "Note: To support Group Policy Management:"
-            $Tasks += "  The target account must have the `"Allow Log on Locally`" user right."
-            $Tasks += "  If the target account is an administrator on the CyberArk server, UAC must be disabled."
-            $Tasks += "  Please consider the risks carefully before enabling this connection component."
+            $Tasks += "Group Policy Management:"
+            $Tasks += " - Note: To support Group Policy Management:"
+            $Tasks += "   - The target account must have the `"Allow Log on Locally`" user right."
+            $Tasks += "   - If the target account is an administrator on the CyberArk server, UAC must be disabled."
+            $Tasks += "   - Please consider the risks carefully before enabling this connection component."
         }
 
     }
@@ -887,14 +912,6 @@ if ($MmcAppsTest) {
 switch ($Application) {
     # Generic MMC connector
     "GenericMMC" {
-        If (
-            !(
-            ($ComponentName) -and ($ComponentDisplayName) -and ($MSCPath)
-            )
-        ) {
-            Write-LogMessage -type Error -MSG "ComponentName, ComponentDisplayName and MscPath are mandatory for Generic MMC components"
-            exit 1
-        }
         if ($tinaCreds) {
             $ComponentZipFile = "$CurrentDirectory\Supplemental\GenericMmc\ConnectionComponent.zip"
             $TargetComponentZipFile = $env:temp + "\CC-" + (Get-Date -UFormat '%Y%m%d%H%M%S') + ".zip"
@@ -928,9 +945,10 @@ switch ($Application) {
 
         Write-LogMessage -type Info -MSG "Installing Generic MMC dispatcher"
         Expand-Archive -Path "$CurrentDirectory\Supplemental\GenericMmc\Dispatcher.zip" -DestinationPath $PSMInstallationFolder\Components\ -Force
-
-        $Tasks += "Create $MSCPath"
-        $Tasks += "Add the `"$ComponentDisplayName`" connection component to applicable domain platforms"
+        
+        $Tasks += "GenericMMC:"
+        $Tasks += " - Create $MSCPath"
+        $Tasks += " - Add the `"$ComponentDisplayName`" connection component to applicable domain platforms"
     }
     "TOTPToken" {
         $ZipPath = "$CurrentDirectory\PSM-TOTPToken.zip"
@@ -975,15 +993,12 @@ switch ($Application) {
             (New-PSMApplicationElement -Xml $xml -EntryType Application -Name PSM-TOTPToken -FileType Exe -Path "$PSMInstallationFolder\Components\TOTPToken.exe" -Method Hash -SessionType "*")
         )
         Add-PSMConfigureAppLockerSection -SectionName "PSM-TOTPToken" -XmlDoc ([REF]$xml) -AppLockerEntries $AppLockerEntries
-        $Tasks += "Import a platform supporting MFADeviceKeys-*.zip"
-        $Tasks += "Associate the TOTP Token connection component with an appropriate platform"
+        $Tasks += "TOTPToken:"
+        $Tasks += "- Import a platform supporting MFADeviceKeys-*.zip"
+        $Tasks += "- Associate the TOTP Token connection component with an appropriate platform"
     }
     "SqlMgmtStudio18" {
-        If (!(Test-Path "C:\Program Files (x86)\Microsoft SQL Server Management Studio 18\Common7\IDE\Ssms.exe")) {
-            Write-LogMessage -type Error -MSG "SQL Management Studio 18 does not appear to be installed. Please install it first."
-            exit 1
-        }
-
+        Write-LogMessage -type Info -MSG "SqlMgmtStudio18: Modifying AppLocker configuration"
         $AppLockerEntries = @(
             (New-PSMApplicationElement -Xml $xml -EntryType Application -Name SSMS18 -FileType Exe -Path "C:\Program Files (x86)\Microsoft SQL Server Management Studio 18\Common7\IDE\Ssms.exe" -Method Publisher),
             (New-PSMApplicationElement -Xml $xml -EntryType Application -Name SSMS18-DTAShell -FileType Exe -Path "C:\Program Files (x86)\Microsoft SQL Server Management Studio 18\Common7\DTASHELL.exe" -Method Publisher),
@@ -995,6 +1010,27 @@ switch ($Application) {
             (New-PSMApplicationElement -Xml $xml -EntryType Libraries -Name SSMS18-Debugger -FileType Dll -Path "C:\Program Files (x86)\Microsoft SQL Server Management Studio 18\Common7\Packages\Debugger\*" -Method Path)
         )
         Add-PSMConfigureAppLockerSection -SectionName "SQL Management Studio 18 Libraries" -XmlDoc ([REF]$xml) -AppLockerEntries $AppLockerEntries -SectionType Libraries
+        $Tasks += "SqlMgmtStudio18:"
+        $Tasks += " - Create/Configure SQL Management Studio connection components"
+        $Tasks += " - - Set ClientInstallationPath in your connection component to C:\Program Files (x86)\Microsoft SQL Server Management Studio 18\Common7\IDE\Ssms.exe"
+    }
+    "SqlMgmtStudio19" {
+        Write-LogMessage -type Info -MSG "SqlMgmtStudio19: Modifying AppLocker configuration"
+        $AppLockerEntries = @(
+            (New-PSMApplicationElement -Xml $xml -EntryType Application -Name SSMS19 -FileType Exe -Path "C:\Program Files (x86)\Microsoft SQL Server Management Studio 19\Common7\IDE\Ssms.exe" -Method Publisher),
+            (New-PSMApplicationElement -Xml $xml -EntryType Application -Name SSMS19-DTAShell -FileType Exe -Path "C:\Program Files (x86)\Microsoft SQL Server Management Studio 19\Common7\DTASHELL.exe" -Method Publisher),
+            (New-PSMApplicationElement -Xml $xml -EntryType Application -Name SSMS19-Profiler -FileType Exe -Path "C:\Program Files (x86)\Microsoft SQL Server Management Studio 19\Common7\Profiler.exe" -Method Publisher)
+        )
+        Add-PSMConfigureAppLockerSection -SectionName "SQL Management Studio 19" -XmlDoc ([REF]$xml) -AppLockerEntries $AppLockerEntries
+        
+        $AppLockerEntries = @(
+            (New-PSMApplicationElement -Xml $xml -EntryType Libraries -Name SSMS19-Debugger -FileType Dll -Path "C:\Program Files (x86)\Microsoft SQL Server Management Studio 19\Common7\Packages\Debugger\*" -Method Path)
+        )
+        Add-PSMConfigureAppLockerSection -SectionName "SQL Management Studio 19 Libraries" -XmlDoc ([REF]$xml) -AppLockerEntries $AppLockerEntries -SectionType Libraries
+        $Tasks += "SqlMgmtStudio19:"
+        $Tasks += " - Create/Configure SQL Management Studio connection components"
+        $Tasks += " - - Set ClientInstallationPath in your connection component to C:\Program Files (x86)\Microsoft SQL Server Management Studio 19\Common7\IDE\Ssms.exe"
+        $Tasks += " - - You may need to disable `"Lock Application Window`" to support SSMS19"
     }
     # Google Chrome 32 bit
     "GoogleChromeX86" {
@@ -1068,16 +1104,19 @@ switch ($Application) {
     # Microsoft Edge 64 bit
     "MicrosoftEdgeX64" {
         Write-LogMessage -type Info -MSG "Checking if Microsoft Edge 32 bit is present"
-        If (Test-Path "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe") {
-            Write-LogMessage -type Error -MSG "Microsoft Edge exists at `"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe`""
-            Write-LogMessage -type Error -MSG "which is the 32-bit installation path. Please uninstall it and run script again if you"
-            Write-LogMessage -type Error -MSG "want to switch to the 64-bit version "
+        $Packages = Get-Package | Where-Object TagId -eq "0E72E0CA-1196-3B77-9B71-9FE483875A84"
+        If ($Packages) {
+            Write-LogMessage -type Error -MSG "Microsoft Edge 32-bit is currently installed."
+            Write-LogMessage -type Error -MSG "Please uninstall it and run script again if you want to switch to the 64-bit version "
+            Write-LogMessage -type Error -MSG " or run the script with -Application MicrosoftEdgeX64 to configure the PSM server"
             exit 1
         }
-        If (Test-Path "C:\Program Files\Microsoft\Edge\Application\msedge.exe") {
+        Write-LogMessage -type Info -MSG "Checking if Microsoft Edge is installed"
+        If (Test-Path "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe") {
             Write-LogMessage -type Info -MSG "Microsoft Edge appears to be installed already. Will not reinstall."
         }
         else {
+            Write-LogMessage -type Info -MSG "Downloading and installing Microsoft Edge 64 bit"
             $DownloadUrl = "http://go.microsoft.com/fwlink/?LinkID=2093437"
             $OutFile = "$env:temp\MicrosoftEdgeStandaloneEnterprise64.msi"
             Write-LogMessage -type Info -MSG "Downloading and installing Microsoft Edge"
@@ -1092,7 +1131,7 @@ switch ($Application) {
             Enable-PSMWebAppSupport -psmRootInstallLocation $PSMInstallationFolder -BackupFile $BackupHardeningXmlFilePath
             $RunHardening = $true
         }
-        $Path = "C:\Program Files\Microsoft\Edge\Application\msedge.exe"
+        $Path = "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
 
         $AppLockerEntries = @(
             (New-PSMApplicationElement -Xml $xml -EntryType Application -Name MicrosoftEdge -FileType Exe -Path $Path -Method Publisher)
@@ -1103,16 +1142,19 @@ switch ($Application) {
     # Microsoft Edge 32 bit
     "MicrosoftEdgeX86" {
         Write-LogMessage -type Info -MSG "Checking if Microsoft Edge 64 bit is present"
-        If (Test-Path "C:\Program Files\Microsoft\Edge\Application\msedge.exe") {
-            Write-LogMessage -type Error -MSG "Microsoft Edge exists at `"C:\Program Files\Microsoft\Edge\Application\msedge.exe`""
-            Write-LogMessage -type Error -MSG "which is the 64-bit installation path. Please uninstall it and run script again if you"
-            Write-LogMessage -type Error -MSG "want to switch to the 32-bit version "
+        $Packages = Get-Package | Where-Object TagId -eq "DF6DD533-D7E9-3ECF-892D-62A737C8619D"
+        If ($Packages) {
+            Write-LogMessage -type Error -MSG "Microsoft Edge 64-bit is currently installed."
+            Write-LogMessage -type Error -MSG "Please uninstall it and run script again if you want to switch to the 64-bit version "
+            Write-LogMessage -type Error -MSG " or run the script with -Application MicrosoftEdgeX86 to configure the PSM server"
             exit 1
         }
+        Write-LogMessage -type Info -MSG "Checking if Microsoft Edge is installed"
         If (Test-Path "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe") {
             Write-LogMessage -type Info -MSG "Microsoft Edge appears to be installed already. Will not reinstall."
         }
         else {
+            Write-LogMessage -type Info -MSG "Downloading and installing Microsoft Edge 32 bit"
             $DownloadUrl = "http://go.microsoft.com/fwlink/?LinkID=2093505"
             $OutFile = "$env:temp\MicrosoftEdgeStandaloneEnterprise86.msi"
             Write-LogMessage -type Info -MSG "Downloading and installing Microsoft Edge"
@@ -1164,178 +1206,3 @@ If ($Tasks) {
         Write-LogMessage -type Info " - $Task"
     }
 }
-# SIG # Begin signature block
-# MIIgTQYJKoZIhvcNAQcCoIIgPjCCIDoCAQExDzANBglghkgBZQMEAgEFADB5Bgor
-# BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG
-# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCBhUMUoeUlb/EMq
-# +v7VQwc7+w4cYYCvZB5cNEZrOM6nbKCCDl8wggboMIIE0KADAgECAhB3vQ4Ft1kL
-# th1HYVMeP3XtMA0GCSqGSIb3DQEBCwUAMFMxCzAJBgNVBAYTAkJFMRkwFwYDVQQK
-# ExBHbG9iYWxTaWduIG52LXNhMSkwJwYDVQQDEyBHbG9iYWxTaWduIENvZGUgU2ln
-# bmluZyBSb290IFI0NTAeFw0yMDA3MjgwMDAwMDBaFw0zMDA3MjgwMDAwMDBaMFwx
-# CzAJBgNVBAYTAkJFMRkwFwYDVQQKExBHbG9iYWxTaWduIG52LXNhMTIwMAYDVQQD
-# EylHbG9iYWxTaWduIEdDQyBSNDUgRVYgQ29kZVNpZ25pbmcgQ0EgMjAyMDCCAiIw
-# DQYJKoZIhvcNAQEBBQADggIPADCCAgoCggIBAMsg75ceuQEyQ6BbqYoj/SBerjgS
-# i8os1P9B2BpV1BlTt/2jF+d6OVzA984Ro/ml7QH6tbqT76+T3PjisxlMg7BKRFAE
-# eIQQaqTWlpCOgfh8qy+1o1cz0lh7lA5tD6WRJiqzg09ysYp7ZJLQ8LRVX5YLEeWa
-# tSyyEc8lG31RK5gfSaNf+BOeNbgDAtqkEy+FSu/EL3AOwdTMMxLsvUCV0xHK5s2z
-# BZzIU+tS13hMUQGSgt4T8weOdLqEgJ/SpBUO6K/r94n233Hw0b6nskEzIHXMsdXt
-# HQcZxOsmd/KrbReTSam35sOQnMa47MzJe5pexcUkk2NvfhCLYc+YVaMkoog28vmf
-# vpMusgafJsAMAVYS4bKKnw4e3JiLLs/a4ok0ph8moKiueG3soYgVPMLq7rfYrWGl
-# r3A2onmO3A1zwPHkLKuU7FgGOTZI1jta6CLOdA6vLPEV2tG0leis1Ult5a/dm2tj
-# IF2OfjuyQ9hiOpTlzbSYszcZJBJyc6sEsAnchebUIgTvQCodLm3HadNutwFsDeCX
-# pxbmJouI9wNEhl9iZ0y1pzeoVdwDNoxuz202JvEOj7A9ccDhMqeC5LYyAjIwfLWT
-# yCH9PIjmaWP47nXJi8Kr77o6/elev7YR8b7wPcoyPm593g9+m5XEEofnGrhO7izB
-# 36Fl6CSDySrC/blTAgMBAAGjggGtMIIBqTAOBgNVHQ8BAf8EBAMCAYYwEwYDVR0l
-# BAwwCgYIKwYBBQUHAwMwEgYDVR0TAQH/BAgwBgEB/wIBADAdBgNVHQ4EFgQUJZ3Q
-# /FkJhmPF7POxEztXHAOSNhEwHwYDVR0jBBgwFoAUHwC/RoAK/Hg5t6W0Q9lWULvO
-# ljswgZMGCCsGAQUFBwEBBIGGMIGDMDkGCCsGAQUFBzABhi1odHRwOi8vb2NzcC5n
-# bG9iYWxzaWduLmNvbS9jb2Rlc2lnbmluZ3Jvb3RyNDUwRgYIKwYBBQUHMAKGOmh0
-# dHA6Ly9zZWN1cmUuZ2xvYmFsc2lnbi5jb20vY2FjZXJ0L2NvZGVzaWduaW5ncm9v
-# dHI0NS5jcnQwQQYDVR0fBDowODA2oDSgMoYwaHR0cDovL2NybC5nbG9iYWxzaWdu
-# LmNvbS9jb2Rlc2lnbmluZ3Jvb3RyNDUuY3JsMFUGA1UdIAROMEwwQQYJKwYBBAGg
-# MgECMDQwMgYIKwYBBQUHAgEWJmh0dHBzOi8vd3d3Lmdsb2JhbHNpZ24uY29tL3Jl
-# cG9zaXRvcnkvMAcGBWeBDAEDMA0GCSqGSIb3DQEBCwUAA4ICAQAldaAJyTm6t6E5
-# iS8Yn6vW6x1L6JR8DQdomxyd73G2F2prAk+zP4ZFh8xlm0zjWAYCImbVYQLFY4/U
-# ovG2XiULd5bpzXFAM4gp7O7zom28TbU+BkvJczPKCBQtPUzosLp1pnQtpFg6bBNJ
-# +KUVChSWhbFqaDQlQq+WVvQQ+iR98StywRbha+vmqZjHPlr00Bid/XSXhndGKj0j
-# fShziq7vKxuav2xTpxSePIdxwF6OyPvTKpIz6ldNXgdeysEYrIEtGiH6bs+XYXvf
-# cXo6ymP31TBENzL+u0OF3Lr8psozGSt3bdvLBfB+X3Uuora/Nao2Y8nOZNm9/Lws
-# 80lWAMgSK8YnuzevV+/Ezx4pxPTiLc4qYc9X7fUKQOL1GNYe6ZAvytOHX5OKSBoR
-# HeU3hZ8uZmKaXoFOlaxVV0PcU4slfjxhD4oLuvU/pteO9wRWXiG7n9dqcYC/lt5y
-# A9jYIivzJxZPOOhRQAyuku++PX33gMZMNleElaeEFUgwDlInCI2Oor0ixxnJpsoO
-# qHo222q6YV8RJJWk4o5o7hmpSZle0LQ0vdb5QMcQlzFSOTUpEYck08T7qWPLd0jV
-# +mL8JOAEek7Q5G7ezp44UCb0IXFl1wkl1MkHAHq4x/N36MXU4lXQ0x72f1LiSY25
-# EXIMiEQmM2YBRN/kMw4h3mKJSAfa9TCCB28wggVXoAMCAQICDHBNxPwWOpXgXVV8
-# DDANBgkqhkiG9w0BAQsFADBcMQswCQYDVQQGEwJCRTEZMBcGA1UEChMQR2xvYmFs
-# U2lnbiBudi1zYTEyMDAGA1UEAxMpR2xvYmFsU2lnbiBHQ0MgUjQ1IEVWIENvZGVT
-# aWduaW5nIENBIDIwMjAwHhcNMjIwMjE1MTMzODM1WhcNMjUwMjE1MTMzODM1WjCB
-# 1DEdMBsGA1UEDwwUUHJpdmF0ZSBPcmdhbml6YXRpb24xEjAQBgNVBAUTCTUxMjI5
-# MTY0MjETMBEGCysGAQQBgjc8AgEDEwJJTDELMAkGA1UEBhMCSUwxEDAOBgNVBAgT
-# B0NlbnRyYWwxFDASBgNVBAcTC1BldGFoIFRpa3ZhMRMwEQYDVQQJEwo5IEhhcHNh
-# Z290MR8wHQYDVQQKExZDeWJlckFyayBTb2Z0d2FyZSBMdGQuMR8wHQYDVQQDExZD
-# eWJlckFyayBTb2Z0d2FyZSBMdGQuMIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIIC
-# CgKCAgEA8rPX6yAVM64+/qMQEttWp7FdAvq9UfgxBrW+R0NtuXhKnjV05zmIL6zi
-# AS0TlNrQqu5ypmuagOWzYKDtIcWEDm6AuSK+QeZprW69c0XYRdIf8X/xNUawXLGe
-# 5LG6ngs2uHGtch9lt2GLMRWILnKviS6l6F06HOAow+aIDcNGOukddypveFrqMEbP
-# 7YKMekkB6c2/whdHzDQiW6V0K82Xp9XUexrbdnFpKWXLfQwkzjcG1xmSiHQUpkSH
-# 4w2AzBzcs+Nidoon5FEIFXGS2b1CcCA8+Po5Dg7//vn2thirXtOqaC+fjP1pUG7m
-# vrZQMg3lTHQA/LTL78R3UzzNb4I9dc8yualcYK155hRU3vZJ3/UtktAvDPC/ewoW
-# thebG77NuKU8YI6l2lMg7jMFZ1//brICD0RGqhmPMK9MrB3elSuMLaO566Ihdrlp
-# zmj4BRDCfPuH0QfwkrejsikGEMo0lErfHSjL3NaiE0PPoC4NW7nc6Wh4Va4e3VFF
-# Z9zdnoTsCKJqk4s13MxBbjdLIkCcfknMSxAloOF9h6IhzWOylSROAy/TZfGL5kzQ
-# qxzcIhdXLWHHWdbz4DD3qxYc6g1G3ZwgFPWf7VbKQU3FsAxgiJvmKPVeOfIN4iYT
-# V4toilRR8KX/IaA1NMrN9EiA//ZhN3HONS/s6AxjjHJTR29GOQkCAwEAAaOCAbYw
-# ggGyMA4GA1UdDwEB/wQEAwIHgDCBnwYIKwYBBQUHAQEEgZIwgY8wTAYIKwYBBQUH
-# MAKGQGh0dHA6Ly9zZWN1cmUuZ2xvYmFsc2lnbi5jb20vY2FjZXJ0L2dzZ2NjcjQ1
-# ZXZjb2Rlc2lnbmNhMjAyMC5jcnQwPwYIKwYBBQUHMAGGM2h0dHA6Ly9vY3NwLmds
-# b2JhbHNpZ24uY29tL2dzZ2NjcjQ1ZXZjb2Rlc2lnbmNhMjAyMDBVBgNVHSAETjBM
-# MEEGCSsGAQQBoDIBAjA0MDIGCCsGAQUFBwIBFiZodHRwczovL3d3dy5nbG9iYWxz
-# aWduLmNvbS9yZXBvc2l0b3J5LzAHBgVngQwBAzAJBgNVHRMEAjAAMEcGA1UdHwRA
-# MD4wPKA6oDiGNmh0dHA6Ly9jcmwuZ2xvYmFsc2lnbi5jb20vZ3NnY2NyNDVldmNv
-# ZGVzaWduY2EyMDIwLmNybDATBgNVHSUEDDAKBggrBgEFBQcDAzAfBgNVHSMEGDAW
-# gBQlndD8WQmGY8Xs87ETO1ccA5I2ETAdBgNVHQ4EFgQU0Vg7IAYAK18fI9dI1YKi
-# WA0D1bEwDQYJKoZIhvcNAQELBQADggIBAFOdA15mFwRIM54PIL/BDZq9RU9IO+YO
-# lAoAYTJHbiTY9ZqvA1isS6EtdYKJgdP/MyZoW7RZmcY5IDXvXFj70TWWvfdqW/Qc
-# MMHtSqhiRb4L92LtR4lS+hWM2fptECpl9BKH28LBZemdKS0jryBEqyAmuEoFJNDk
-# wxzQVKPksvapvmSYwPiBCtzPyHTRo5HnLBXpK/LUBJu8epAgKz6LoJjnrTIF4U8R
-# owrtUC0I6f4uj+sKYE0iV3/TzwsTJsp7MQShoILPr1/75fQjU/7Pl2fbM++uAFBC
-# sHQHYvar9KLslFPX4g+cDdtOHz5vId8QYZnhCduVgzUGvELmXXR1FYV7oJNnh3eY
-# Xc5gm7vSNKlZB8l7Ls6h8icBV2zQbojDiH0JOD//ph62qvnMp8ev9mvhvLXRCIxc
-# aU7CYI0gNVvg9LPi5j1/tswqBc9XAfHUG9ZYVxYCgvynEmnJ5TuEh6GesGRPbNIL
-# l418MFn4EPQUqxB51SMihIcyqu6+3qOlco8Dsy1y0gC0Hcx+unDZPsN8k+rhueN2
-# HXrPkAJ2bsEJd7adPy423FKbA7bRCOc6dWOFH1OGANfEG0Rjw9RfcsI84OkKpQ7R
-# XldpKIcWuaYMlfYzsl+P8dJru+KgA8Vh7GTVb5USzFGeMyOMtyr1/L2bIyRVSiLL
-# 8goMl4DTDOWeMYIRRDCCEUACAQEwbDBcMQswCQYDVQQGEwJCRTEZMBcGA1UEChMQ
-# R2xvYmFsU2lnbiBudi1zYTEyMDAGA1UEAxMpR2xvYmFsU2lnbiBHQ0MgUjQ1IEVW
-# IENvZGVTaWduaW5nIENBIDIwMjACDHBNxPwWOpXgXVV8DDANBglghkgBZQMEAgEF
-# AKB8MBAGCisGAQQBgjcCAQwxAjAAMBkGCSqGSIb3DQEJAzEMBgorBgEEAYI3AgEE
-# MBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEVMC8GCSqGSIb3DQEJBDEiBCC4
-# ZEE377JBYAGhEsUhytWLWY7SZwRZsq/tGOZ04HqG6TANBgkqhkiG9w0BAQEFAASC
-# AgBIIAr9xqg5K+fpidlQVC8WXRkBMvDKjZweNabwsaqszgrwr1eUldPQd4CI9t2N
-# /ei6oXZR9RbGjLfG6w91kjjuGedZpKtjU1GHuwBYLKGQiC7/EFv9Img8BLXnbNRH
-# 6Kn3NLjzd3BhzPncuiqZy6XGGWlMbLyLCvIGIPzmPxgxBryyI3ZkFgDgLHovAGzK
-# Ab3jukb9u5AW9tkWE9qo0LmTJx/b+DyrGtQEGbp12TO4IBJXBeytQbehFHi14oXk
-# Gd5FFXf1VbN7r0tt/N6uQ+QUYalHHjGdcwqv3DEwOoc9Ln1AlQ6fx9p96dtKp6+4
-# X2eNtHM7g4o9j1Uw7rZAMKDfEU8uXcBQAR9luv0DUwb/xNhvsZixNTtPGbyh694r
-# 6fhr3SUKN4vYAjSDvl9Y1GYjh6GQUJAdsuuRidVbcwwgNVwXhhLk5PMWKjcdAfye
-# 7ntRgFYb7sg7xCg3Kfs2jMHaOBV+W6e/3Tzduqx159EtwZNs6Bftpo1WL0mCzCYv
-# L2rFOPPnabucMcPRc7Zeq9aizZtCjHhbmQQTW2VB+KGeEstyv9Y3dCWkRV4Y9lsf
-# fTfADQcH8ChzdH3uaQwnN0HFgbZRak5bp8RFnMu/jcdu31XSSQENl/h3D4k5m4kP
-# ZUzvVC9pSVTaBErYmGJa10AQlf4ZXMOalfEsAwsMjKjSJaGCDiswgg4nBgorBgEE
-# AYI3AwMBMYIOFzCCDhMGCSqGSIb3DQEHAqCCDgQwgg4AAgEDMQ0wCwYJYIZIAWUD
-# BAIBMIH+BgsqhkiG9w0BCRABBKCB7gSB6zCB6AIBAQYLYIZIAYb4RQEHFwMwITAJ
-# BgUrDgMCGgUABBQZCa2bJgGaX6HW0Tp9CdievW/unwIUG+886YRU+CNDfWc1iK8K
-# pyR+wFUYDzIwMjIxMTE1MTUwNTUyWjADAgEeoIGGpIGDMIGAMQswCQYDVQQGEwJV
-# UzEdMBsGA1UEChMUU3ltYW50ZWMgQ29ycG9yYXRpb24xHzAdBgNVBAsTFlN5bWFu
-# dGVjIFRydXN0IE5ldHdvcmsxMTAvBgNVBAMTKFN5bWFudGVjIFNIQTI1NiBUaW1l
-# U3RhbXBpbmcgU2lnbmVyIC0gRzOgggqLMIIFODCCBCCgAwIBAgIQewWx1EloUUT3
-# yYnSnBmdEjANBgkqhkiG9w0BAQsFADCBvTELMAkGA1UEBhMCVVMxFzAVBgNVBAoT
-# DlZlcmlTaWduLCBJbmMuMR8wHQYDVQQLExZWZXJpU2lnbiBUcnVzdCBOZXR3b3Jr
-# MTowOAYDVQQLEzEoYykgMjAwOCBWZXJpU2lnbiwgSW5jLiAtIEZvciBhdXRob3Jp
-# emVkIHVzZSBvbmx5MTgwNgYDVQQDEy9WZXJpU2lnbiBVbml2ZXJzYWwgUm9vdCBD
-# ZXJ0aWZpY2F0aW9uIEF1dGhvcml0eTAeFw0xNjAxMTIwMDAwMDBaFw0zMTAxMTEy
-# MzU5NTlaMHcxCzAJBgNVBAYTAlVTMR0wGwYDVQQKExRTeW1hbnRlYyBDb3Jwb3Jh
-# dGlvbjEfMB0GA1UECxMWU3ltYW50ZWMgVHJ1c3QgTmV0d29yazEoMCYGA1UEAxMf
-# U3ltYW50ZWMgU0hBMjU2IFRpbWVTdGFtcGluZyBDQTCCASIwDQYJKoZIhvcNAQEB
-# BQADggEPADCCAQoCggEBALtZnVlVT52Mcl0agaLrVfOwAa08cawyjwVrhponADKX
-# ak3JZBRLKbvC2Sm5Luxjs+HPPwtWkPhiG37rpgfi3n9ebUA41JEG50F8eRzLy60b
-# v9iVkfPw7mz4rZY5Ln/BJ7h4OcWEpe3tr4eOzo3HberSmLU6Hx45ncP0mqj0hOHE
-# 0XxxxgYptD/kgw0mw3sIPk35CrczSf/KO9T1sptL4YiZGvXA6TMU1t/HgNuR7v68
-# kldyd/TNqMz+CfWTN76ViGrF3PSxS9TO6AmRX7WEeTWKeKwZMo8jwTJBG1kOqT6x
-# zPnWK++32OTVHW0ROpL2k8mc40juu1MO1DaXhnjFoTcCAwEAAaOCAXcwggFzMA4G
-# A1UdDwEB/wQEAwIBBjASBgNVHRMBAf8ECDAGAQH/AgEAMGYGA1UdIARfMF0wWwYL
-# YIZIAYb4RQEHFwMwTDAjBggrBgEFBQcCARYXaHR0cHM6Ly9kLnN5bWNiLmNvbS9j
-# cHMwJQYIKwYBBQUHAgIwGRoXaHR0cHM6Ly9kLnN5bWNiLmNvbS9ycGEwLgYIKwYB
-# BQUHAQEEIjAgMB4GCCsGAQUFBzABhhJodHRwOi8vcy5zeW1jZC5jb20wNgYDVR0f
-# BC8wLTAroCmgJ4YlaHR0cDovL3Muc3ltY2IuY29tL3VuaXZlcnNhbC1yb290LmNy
-# bDATBgNVHSUEDDAKBggrBgEFBQcDCDAoBgNVHREEITAfpB0wGzEZMBcGA1UEAxMQ
-# VGltZVN0YW1wLTIwNDgtMzAdBgNVHQ4EFgQUr2PWyqNOhXLgp7xB8ymiOH+AdWIw
-# HwYDVR0jBBgwFoAUtnf6aUhHn1MS1cLqBzJ2B9GXBxkwDQYJKoZIhvcNAQELBQAD
-# ggEBAHXqsC3VNBlcMkX+DuHUT6Z4wW/X6t3cT/OhyIGI96ePFeZAKa3mXfSi2VZk
-# hHEwKt0eYRdmIFYGmBmNXXHy+Je8Cf0ckUfJ4uiNA/vMkC/WCmxOM+zWtJPITJBj
-# SDlAIcTd1m6JmDy1mJfoqQa3CcmPU1dBkC/hHk1O3MoQeGxCbvC2xfhhXFL1TvZr
-# jfdKer7zzf0D19n2A6gP41P3CnXsxnUuqmaFBJm3+AZX4cYO9uiv2uybGB+queM6
-# AL/OipTLAduexzi7D1Kr0eOUA2AKTaD+J20UMvw/l0Dhv5mJ2+Q5FL3a5NPD6ita
-# s5VYVQR9x5rsIwONhSrS/66pYYEwggVLMIIEM6ADAgECAhB71OWvuswHP6EBIwQi
-# QU0SMA0GCSqGSIb3DQEBCwUAMHcxCzAJBgNVBAYTAlVTMR0wGwYDVQQKExRTeW1h
-# bnRlYyBDb3Jwb3JhdGlvbjEfMB0GA1UECxMWU3ltYW50ZWMgVHJ1c3QgTmV0d29y
-# azEoMCYGA1UEAxMfU3ltYW50ZWMgU0hBMjU2IFRpbWVTdGFtcGluZyBDQTAeFw0x
-# NzEyMjMwMDAwMDBaFw0yOTAzMjIyMzU5NTlaMIGAMQswCQYDVQQGEwJVUzEdMBsG
-# A1UEChMUU3ltYW50ZWMgQ29ycG9yYXRpb24xHzAdBgNVBAsTFlN5bWFudGVjIFRy
-# dXN0IE5ldHdvcmsxMTAvBgNVBAMTKFN5bWFudGVjIFNIQTI1NiBUaW1lU3RhbXBp
-# bmcgU2lnbmVyIC0gRzMwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCv
-# Doqq+Ny/aXtUF3FHCb2NPIH4dBV3Z5Cc/d5OAp5LdvblNj5l1SQgbTD53R2D6T8n
-# SjNObRaK5I1AjSKqvqcLG9IHtjy1GiQo+BtyUT3ICYgmCDr5+kMjdUdwDLNfW48I
-# HXJIV2VNrwI8QPf03TI4kz/lLKbzWSPLgN4TTfkQyaoKGGxVYVfR8QIsxLWr8mwj
-# 0p8NDxlsrYViaf1OhcGKUjGrW9jJdFLjV2wiv1V/b8oGqz9KtyJ2ZezsNvKWlYEm
-# LP27mKoBONOvJUCbCVPwKVeFWF7qhUhBIYfl3rTTJrJ7QFNYeY5SMQZNlANFxM48
-# A+y3API6IsW0b+XvsIqbAgMBAAGjggHHMIIBwzAMBgNVHRMBAf8EAjAAMGYGA1Ud
-# IARfMF0wWwYLYIZIAYb4RQEHFwMwTDAjBggrBgEFBQcCARYXaHR0cHM6Ly9kLnN5
-# bWNiLmNvbS9jcHMwJQYIKwYBBQUHAgIwGRoXaHR0cHM6Ly9kLnN5bWNiLmNvbS9y
-# cGEwQAYDVR0fBDkwNzA1oDOgMYYvaHR0cDovL3RzLWNybC53cy5zeW1hbnRlYy5j
-# b20vc2hhMjU2LXRzcy1jYS5jcmwwFgYDVR0lAQH/BAwwCgYIKwYBBQUHAwgwDgYD
-# VR0PAQH/BAQDAgeAMHcGCCsGAQUFBwEBBGswaTAqBggrBgEFBQcwAYYeaHR0cDov
-# L3RzLW9jc3Aud3Muc3ltYW50ZWMuY29tMDsGCCsGAQUFBzAChi9odHRwOi8vdHMt
-# YWlhLndzLnN5bWFudGVjLmNvbS9zaGEyNTYtdHNzLWNhLmNlcjAoBgNVHREEITAf
-# pB0wGzEZMBcGA1UEAxMQVGltZVN0YW1wLTIwNDgtNjAdBgNVHQ4EFgQUpRMBqZ+F
-# zBtuFh5fOzGqeTYAex0wHwYDVR0jBBgwFoAUr2PWyqNOhXLgp7xB8ymiOH+AdWIw
-# DQYJKoZIhvcNAQELBQADggEBAEaer/C4ol+imUjPqCdLIc2yuaZycGMv41UpezlG
-# Tud+ZQZYi7xXipINCNgQujYk+gp7+zvTYr9KlBXmgtuKVG3/KP5nz3E/5jMJ2aJZ
-# EPQeSv5lzN7Ua+NSKXUASiulzMub6KlN97QXWZJBw7c/hub2wH9EPEZcF1rjpDvV
-# aSbVIX3hgGd+Yqy3Ti4VmuWcI69bEepxqUH5DXk4qaENz7Sx2j6aescixXTN30cJ
-# hsT8kSWyG5bphQjo3ep0YG5gpVZ6DchEWNzm+UgUnuW/3gC9d7GYFHIUJN/HESwf
-# AD/DSxTGZxzMHgajkF9cVIs+4zNbgg/Ft4YCTnGf6WZFP3YxggJaMIICVgIBATCB
-# izB3MQswCQYDVQQGEwJVUzEdMBsGA1UEChMUU3ltYW50ZWMgQ29ycG9yYXRpb24x
-# HzAdBgNVBAsTFlN5bWFudGVjIFRydXN0IE5ldHdvcmsxKDAmBgNVBAMTH1N5bWFu
-# dGVjIFNIQTI1NiBUaW1lU3RhbXBpbmcgQ0ECEHvU5a+6zAc/oQEjBCJBTRIwCwYJ
-# YIZIAWUDBAIBoIGkMBoGCSqGSIb3DQEJAzENBgsqhkiG9w0BCRABBDAcBgkqhkiG
-# 9w0BCQUxDxcNMjIxMTE1MTUwNTUyWjAvBgkqhkiG9w0BCQQxIgQgva7WlaHeay13
-# 9H2VkwVXfqvrGDHt2CkNTyb5ZDQO+kUwNwYLKoZIhvcNAQkQAi8xKDAmMCQwIgQg
-# xHTOdgB9AjlODaXk3nwUxoD54oIBPP72U+9dtx/fYfgwCwYJKoZIhvcNAQEBBIIB
-# AAVlwXNPpAP0K8BEfuuM60jfvZPr9u16OrQJEajx+EK4/j43o9cr9Fc7iB1NvqRZ
-# 8eRm/YRFDLUCBdM2nMvLrS+VAubctf28XDQygE/VQeWdYd0utJyXO9r35d2XZyoL
-# 0XJyDA3a8WK4j+EzonQgAANC6Gsti+OAK+EknEmINz82zsdM+U+4hWS3dGnw1FOO
-# x+UUV73xtebL+A6y8zaJYTJ+qLMUxuYXTC9uUnP5wnir6Lf9vy1Sfdj6U1Coefuz
-# ex0OKWDb4ha7/hLSIxOK8V7BTmge6TArQlCVQJMLwl3/FsOs1sLzOgonaYS/nx75
-# k0uxLGnIvxyKNPH2Bqgayl8=
-# SIG # End signature block
