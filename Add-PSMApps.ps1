@@ -735,7 +735,7 @@ If ("SqlMgmtStudio18" -in $Application) {
 
 If ("SqlMgmtStudio19" -in $Application) {
     If (!(Test-Path "C:\Program Files (x86)\Microsoft SQL Server Management Studio 19\Common7\IDE\Ssms.exe")) {
-        Write-LogMessage -type Error -MSG "SQL Management Studio 18 does not appear to be installed. Please install it first."
+        Write-LogMessage -type Error -MSG "SQL Management Studio 19 does not appear to be installed. Please install it first."
         exit 1
     }
 }
