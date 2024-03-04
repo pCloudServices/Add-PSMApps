@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param (
     [Parameter(Mandatory = $true)]
-    [ValidateSet("MicrosoftEdgeX86", "MicrosoftEdgeX64", "GoogleChromeX86", "GoogleChromeX64", "SqlMgmtStudio18", "SqlMgmtStudio19", "GenericMMC", "TOTPToken", "ADUC", "DNS", "DHCP", "ADDT", "ADSS", "GPMC")]
+    [ValidateSet("MicrosoftEdgeX86", "MicrosoftEdgeX64", "GoogleChromeX86", "GoogleChromeX64", "SqlMgmtStudio18", "SqlMgmtStudio19", "GenericMMC", "TOTPToken", "ADUC", "DNS", "DHCP", "ADDT", "ADSS", "GPMC", "WebDriverUpdater")]
     [string[]]
     $Application,
     [Parameter(Mandatory = $false)]
@@ -22,10 +22,14 @@ param (
     $SupportGPMC,
     [Parameter(Mandatory = $false)]
     [string]
-    $PortalUrl
+    $PortalUrl,
+    [Parameter(Mandatory = $false)]
+    [Alias("WDUPath")]
+    [string]
+    $WebDriverUpdaterPath
 )
 
-# Version: 1.0.3
+# Version: 1.1.0
 
 Function Add-PSMConfigureAppLockerSection {
     [CmdletBinding()]
@@ -382,6 +386,16 @@ function Get-PSMDirectory() {
     return $PSM_INSTALL_DIREC
 }
 
+function Get-CPMInstallDirectory {
+    try {
+        $Path = (Get-CimInstance -ClassName win32_service | Where-Object { $_.Name -match 'CyberArk Password Manager' } ).PathName -replace " /SERVICE", "" -replace "`"", "" -replace "\\PMEngine.exe", ""
+        return $Path
+    }
+    catch {
+        return $false
+    }
+}
+
 function New-PSMApplicationElement {
     [CmdletBinding()]
     param (
@@ -714,6 +728,20 @@ $BackupHardeningXmlFilePath = "$PSMInstallationFolder\Hardening\PSMHardening.$Ba
 
 # Test for issues before we start making changes
 
+If ("WebDriverUpdater" -in $Application) {
+    If (!($WebDriverUpdaterPath)) {
+        Write-LogMessage -type Error -MSG "-WebDriverUpdaterPath is mandatory when WebDriverUpdater is selected. Exiting."
+        exit 1
+    }
+    $Result = `
+    (Test-Path -PathType Container -Path "$WebDriverUpdaterPath") -and `
+    (Test-Path -PathType Leaf -Path "$WebDriverUpdaterPath\WebDriverUpdater.exe.config") -and `
+    (Test-Path -PathType Leaf -Path "$WebDriverUpdaterPath\WebDriverUpdater.exe")
+    If ($false -eq $Result) {
+        Write-Error "Web Driver Updater files not found in $WebDriverUpdaterPath. Exiting."
+        exit 1
+    }
+}
 
 if ($AppLockerXmlFilePath) {
     if (-not (Test-Path -Path $AppLockerXmlFilePath)) {
@@ -760,7 +788,7 @@ $Tasks = @()
 
 # Only prompt for admin credentials if we need to import connection components.
 
-$ListApplicationsWithoutConnectionComponents = "GoogleChromeX86", "GoogleChromeX64", "SqlMgmtStudio18", "SqlMgmtStudio19", "MicrosoftEdgeX86", "MicrosoftEdgeX64"
+$ListApplicationsWithoutConnectionComponents = "GoogleChromeX86", "GoogleChromeX64", "SqlMgmtStudio18", "SqlMgmtStudio19", "MicrosoftEdgeX86", "MicrosoftEdgeX64", "WebDriverUpdater"
 
 switch ($Application) {
     { $PSItem -in $ListApplicationsWithoutConnectionComponents } {
@@ -916,6 +944,95 @@ if ($MmcAppsTest) {
 }
 
 switch ($Application) {
+    # Web Driver Updater
+    "WebDriverUpdater" {
+        $CreatedTask = $false
+        $WebDriverUpdaterExeFile = "$WebDriverUpdaterPath\WebDriverUpdater.exe"
+        $WebDriverUpdaterConfigFile = "$WebDriverUpdaterPath\WebDriverUpdater.exe.Config"
+        Write-LogMessage -type Info -MSG "Updating WebDriverUpdater configuration file at $WebDriverUpdaterConfigFile"
+        $CPMInstallDirectory = Get-CPMInstallDirectory
+        $CPMBinDirectory = "$CPMInstallDirectory\bin"
+        $PSMComponentsDirectory = "$PSMInstallationFolder\Components"
+        $PSMScriptsDirectory = "$PSMInstallationFolder\Scripts"
+        $WebDriverUpdaterConfigXml = New-Object System.Xml.XmlDocument
+        $WebDriverUpdaterConfigXml.load($WebDriverUpdaterConfigFile)
+        If ($PSMInstallationFolder) {
+            Write-LogMessage -type Verbose -MSG "Updating PathToPSMDrivers"
+            $PSMComponentsKey = $WebDriverUpdaterConfigXml.configuration.appSettings.add | Where-Object key -eq "PathToPSMDrivers"
+            $PSMComponentsKey.SetAttribute("value", $PSMComponentsDirectory)
+
+            Write-LogMessage -type Verbose -MSG "Updating PathToUpdateAppLockerRuleScript"
+            $PSMScriptsKey = $WebDriverUpdaterConfigXml.configuration.appSettings.add | Where-Object key -eq "PathToUpdateAppLockerRuleScript"
+            $PSMScriptsKey.SetAttribute("value", $PSMScriptsDirectory)
+
+            $WebDriverUpdaterChangedXml = $true
+        }
+        if ($CPMBinDirectory) {
+            Write-LogMessage -type Verbose -MSG "Updating PathToCPMDrivers"
+            $CPMBinKey = $WebDriverUpdaterConfigXml.configuration.appSettings.add | Where-Object key -eq "PathToCPMDrivers"
+            $CPMBinKey.SetAttribute("value", $CPMBinDirectory)
+
+            $WebDriverUpdaterChangedXml = $true
+        }
+        If ($WebDriverUpdaterChangedXml) {
+            try {
+                Write-LogMessage -type Verbose -MSG "Writing WebDriverUpdater configuration"
+                $WebDriverUpdaterConfigXml.Save($WebDriverUpdaterConfigFile)
+            }
+            catch {
+                Write-LogMessage -type Error -MSG "Failed to save configuration. Please configure WebDriverUpdater.exe.config manually."
+                $Tasks += ("Update {0}" -f $WebDriverUpdaterConfigFile)
+            }
+        }
+        else {
+            Write-LogMessage -type Error -MSG "Failed to detect either PSM or CPM installation directories. Please configure WebDriverUpdater.exe.config manually."
+            $Tasks += ("Update {0}" -f $WebDriverUpdaterConfigFile)
+        }
+        Write-LogMessage -type Info -MSG "Creating/updating WebDriverUpdater scheduled task"
+
+        # Can't create a daily repeating task trigger so create a repeating trigger and copy its Repetition setting to the actual task.
+        $OneDay = New-TimeSpan -Days 1
+        $OneHour = New-TimeSpan -Hours 1
+        $RepeatingTrigger = New-ScheduledTaskTrigger -Once -RepetitionInterval $OneHour -RepetitionDuration $OneDay -at 00:00
+
+        $MinutesPast = Get-Random -Minimum 0 -Maximum 59
+        $TaskTrigger = New-ScheduledTaskTrigger -Daily -DaysInterval 1 -At 00:$MinutesPast
+        $TaskTrigger.Repetition = $RepeatingTrigger.Repetition
+
+        $TaskAction = New-ScheduledTaskAction -Execute "$env:windir\system32\WindowsPowerShell\v1.0\powershell.exe" -Argument ("-ExecutionPolicy Bypass -File `"{0}`"" -f $WebDriverUpdaterExeFile)
+
+        $TaskPrincipal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount
+
+        $TaskSettings = New-ScheduledTaskSettingsSet
+
+        $TaskConfiguration = New-ScheduledTask -Action $TaskAction -Settings $TaskSettings -Trigger $TaskTrigger -Principal $TaskPrincipal
+
+        try {
+            $CurrentTask = Get-ScheduledTask -TaskName "CyberArk - Update Web Drivers"
+            If ($CurrentTask) {
+                Write-LogMessage -type Info -MSG "Scheduled task already exists, it will be exported and removed."
+                Export-ScheduledTask -TaskName "CyberArk - Update Web Drivers" | Out-File ("OldWebDriverUpdaterTask-{0}.xml" -f $BackupSuffix)
+                Unregister-ScheduledTask -TaskName "CyberArk - Update Web Drivers" -Confirm:$false
+            }
+            Write-LogMessage -type Info -MSG "Creating scheduled task: `"CyberArk - Update Web Drivers`""
+            $CreatedTask = Register-ScheduledTask -InputObject $TaskConfiguration -TaskName "CyberArk - Update Web Drivers"
+            Write-LogMessage -type Info -MSG "Created hourly scheduled task: `"CyberArk - Update Web Drivers`""
+        }
+        catch {
+            Write-LogMessage -type Error -MSG "Failed to register scheduled task. Please do so manually."
+            $Tasks += "Create scheduled task to run WebDriverUpdater manually every hour."
+        }
+        If ($CreatedTask) {
+            try {
+                Write-LogMessage -type Info -MSG "Executing task"
+                $null = Start-ScheduledTask -TaskName "CyberArk - Update Web Drivers"
+                $Tasks += "Verify that drivers have updated successfully"
+            }
+            catch {
+                Write-LogMessage -type Error -MSG "Could not start task. Please start it manually and verify that drivers are updated."
+            }
+        }
+    }
     # Generic MMC connector
     "GenericMMC" {
         if ($tinaCreds) {

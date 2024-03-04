@@ -49,6 +49,7 @@ If `-HTML5` is omitted, or set to Default, the AllowSelectHTML5 user parameter w
 | SqlMgmtStudio18       | No                      | Microsoft SQL Management Studio 18                      |
 | SqlMgmtStudio19       | No                      | Microsoft SQL Management Studio 19                      |
 | TOTPToken             | No                      | CyberArk TOTP MFA Code Generator Connection Component   |
+| WebDriverUpdater      | No                      | Configure and schedule CyberArk Web Driver Updater tool |
 
 See below for further information on operations performed for each component.
 
@@ -102,3 +103,10 @@ Any instances of `{address}` in ClientInstallationPath will be replaced with the
 - Adds required EXE and DLL files to AppLocker configuration
 - Imports Connection Component
 
+#### WebDriverUpdater
+- Requires WebDriverUpdater
+  - Download from https://cyberark.my.site.com/mplace/s/#a35Ht000000rjXlIAI-a39Ht000001kceVIAQ
+  - Extract to a permanent location
+  - Provide the path with the `-WebDriverUpdaterPath` or `-WDUPath` parameter
+- Configures WebDriverUpdater.exe.config with the locations of PSM and/or CPM
+- Creates a scheduled task to run the updater every hour
