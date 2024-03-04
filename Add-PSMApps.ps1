@@ -712,6 +712,9 @@ $AppLockerXmlFilePath = "$PSMInstallationFolder\Hardening\PSMConfigureAppLocker.
 $BackupAppLockerXmlFilePath = "$PSMInstallationFolder\Hardening\PSMConfigureAppLocker.$BackupSuffix.bkp"
 $BackupHardeningXmlFilePath = "$PSMInstallationFolder\Hardening\PSMHardening.$BackupSuffix.bkp"
 
+# Test for issues before we start making changes
+
+
 if ($AppLockerXmlFilePath) {
     if (-not (Test-Path -Path $AppLockerXmlFilePath)) {
         Write-LogMessage -type Error -MSG "PSMConfigureAppLocker.xml not found in PSM Hardening folder. Aborting."
