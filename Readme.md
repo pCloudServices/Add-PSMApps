@@ -1,4 +1,4 @@
-# Add-PSMApplication
+# Add-PSMApps
 
 ## Information
 Script to assist in configuration of custom connection components
@@ -15,7 +15,7 @@ The script will prompt for credentials for the _admin account or installeruser a
 
 ## Parameters
 ### Mandatory Parameters
-Add-PSMApplication will prompt for these if not provided on the command line
+Add-PSMApps will prompt for these if not provided on the command line
 
 | Parameter     | Description  	                                          |
 | ---           | ---	                                                    |
