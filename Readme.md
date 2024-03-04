@@ -5,11 +5,11 @@ Script to assist in configuration of custom connection components
 
 The script is provided in a zip file containing:
 - Readme.md file
-- Add-PSMApplication.ps1 - script to run
+- Add-PSMApps.ps1 - script to run
 - Supplemental - directory containing additional files as needed to support connection component creation
 
 ## Usage
-PS C:\> .\Add-PSMApplication.ps1 -Application `(Comma-separated list of applications to configure)`
+PS C:\> .\Add-PSMApps.ps1 -Application `(Comma-separated list of applications to configure)`
 
 The script will prompt for credentials for the _admin account or installeruser account, to import required components to the Privilege Cloud platform. This only needs to be supplied once, and can be skipped when executing the script on additional connector servers.
 
@@ -92,12 +92,12 @@ Any instances of `{address}` in ClientInstallationPath will be replaced with the
 
 #### Microsoft SQL Management Studio 18/19
 - Adds required EXE and DLL files to AppLocker configuration
-- Does not install SSMS - this must be installed manually before running Add-PSMApplication
+- Does not install SSMS - this must be installed manually before running Add-PSMApps
 - The required connection component already exists by default in Privilege Cloud for Windows Authentication
 - Database Authentication support requires connection component from CyberArk Marketplace
 
 #### TOTPToken
-- Requires the component zip to be downloaded from the marketplace and placed in the same folder as Add-PSMApplication
+- Requires the component zip to be downloaded from the marketplace and placed in the same folder as Add-PSMApps
   - https://cyberark.my.site.com/mplace/s/#a352J000000GPw5QAG-a392J000002hZX8QAM
 - Adds required EXE and DLL files to AppLocker configuration
 - Imports Connection Component
