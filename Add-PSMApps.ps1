@@ -955,17 +955,23 @@ switch ($Application) {
         $WebDriverUpdaterConfigXml = New-Object System.Xml.XmlDocument
         $WebDriverUpdaterConfigXml.load($WebDriverUpdaterConfigFile)
         If ($PSMInstallationFolder) {
-            Write-LogMessage -type Verbose -MSG "Updating PathToPSMDrivers"
             $PSMComponentsDirectory = "$PSMInstallationFolder\Components"
             $PSMScriptsDirectory = "$PSMInstallationFolder\Scripts"
-            $PSMComponentsKey = $WebDriverUpdaterConfigXml.configuration.appSettings.add | Where-Object key -eq "PathToPSMDrivers"
-            $PSMComponentsKey.SetAttribute("value", $PSMComponentsDirectory)
-            
-            Write-LogMessage -type Verbose -MSG "Updating PathToUpdateAppLockerRuleScript"
-            $PSMScriptsKey = $WebDriverUpdaterConfigXml.configuration.appSettings.add | Where-Object key -eq "PathToUpdateAppLockerRuleScript"
-            $PSMScriptsKey.SetAttribute("value", $PSMScriptsDirectory)
-            
-            $WebDriverUpdaterChangedXml = $true
+            $PSMUpdateAppLockerScriptPath = "$PSMScriptsDirectory\UpdateApplockerRule.ps1"
+            $PSMUpdateAppLockerScriptExists = Test-Path -Type Leaf -Path $PSMUpdateAppLockerScriptPath
+            If ($true -eq $PSMUpdateAppLockerScriptExists) {
+                Write-LogMessage -type Verbose -MSG "Updating PathToPSMDrivers"
+                $PSMComponentsKey = $WebDriverUpdaterConfigXml.configuration.appSettings.add | Where-Object key -eq "PathToPSMDrivers"
+                $PSMComponentsKey.SetAttribute("value", $PSMComponentsDirectory)
+                
+                Write-LogMessage -type Verbose -MSG "Updating PathToUpdateAppLockerRuleScript"
+                $PSMScriptsKey = $WebDriverUpdaterConfigXml.configuration.appSettings.add | Where-Object key -eq "PathToUpdateAppLockerRuleScript"
+                $PSMScriptsKey.SetAttribute("value", $PSMScriptsDirectory)
+                
+                $WebDriverUpdaterChangedXml = $true
+            } else {
+                Write-LogMessage -type Error -MSG "AppLocker update script not found, which may indicate an unsupported version of PSM. Skipping PSM configuration."
+            }
         }
         if ($CPMInstallDirectory) {
             $CPMBinDirectory = "$CPMInstallDirectory\bin"
