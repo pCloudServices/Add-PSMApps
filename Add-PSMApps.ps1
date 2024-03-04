@@ -1332,6 +1332,7 @@ If ($RunHardening) {
     Write-LogMessage -Type Info -MSG "End of PSM Hardening script output"
 }
 
+Write-LogMessage -type Success ("-" * ("All tasks completed.".Length))
 Write-LogMessage -type Success "All tasks completed."
 If ($Tasks) {
     Write-LogMessage -type Info "The following additional steps may be required:"
