@@ -1000,9 +1000,9 @@ switch ($Application) {
         $TaskTrigger = New-ScheduledTaskTrigger -Daily -DaysInterval 1 -At 00:$MinutesPast
         $TaskTrigger.Repetition = $RepeatingTrigger.Repetition
 
-        $TaskAction = New-ScheduledTaskAction -Execute "$env:windir\system32\WindowsPowerShell\v1.0\powershell.exe" -Argument ("-ExecutionPolicy Bypass -File `"{0}`"" -f $WebDriverUpdaterExeFile)
+        $TaskAction = New-ScheduledTaskAction -Execute $WebDriverUpdaterExeFile
 
-        $TaskPrincipal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount
+        $TaskPrincipal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
 
         $TaskSettings = New-ScheduledTaskSettingsSet
 
