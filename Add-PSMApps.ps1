@@ -45,12 +45,12 @@ Function Add-PSMConfigureAppLockerSection {
         $SectionType = "Application"
     )
     # Prepare the comments that will begin and end the section
-    Write-LogMessage -type Verbose -MSG "Adding $SectionName section to AppLocker" 
+    Write-LogMessage -type Verbose -MSG "Adding $SectionName section to AppLocker"
     $XmlEntries = @(
         (New-XmlComment -Xml $XmlDoc -Comment " $SectionName section "),
         (New-XmlComment -Xml $XmlDoc -Comment " End of $SectionName section ")
     )
-        
+
     # Identify the Allowed DLLs comment. If adding an application, the new section will be added just before that comment
     $AllowedDllsComment = $XmlDoc.PSMAppLockerConfiguration.AllowedApplications.SelectSingleNode("/PSMAppLockerConfiguration/AllowedApplications/comment()[. = ' Allowed DLLs ']")
     # for each new comment
@@ -66,7 +66,7 @@ Function Add-PSMConfigureAppLockerSection {
             else {
                 # it's a Libraries section, so create it at the very end of the AllowedApplications element
                 $null = $xml.PSMAppLockerConfiguration.AllowedApplications.AppendChild($XmlEntry)
-        
+
             }
         }
         else {
@@ -77,7 +77,7 @@ Function Add-PSMConfigureAppLockerSection {
     # for each new entry
     $AppLockerEntries | ForEach-Object {
         $AppLockerEntry = $_
-            
+
         # check if it already exists
         $ExistingEntries = Get-PSMApplicationsByPath -Xml $XmlDoc -AppLockerEntry $AppLockerEntry
         If (!($ExistingEntries)) {
@@ -156,7 +156,7 @@ Function Test-PvwaToken {
         [Parameter(Mandatory = $true)]
         [string]$pvwaAddress,
         [Parameter(Mandatory = $true)]
-        [string]$Token        
+        [string]$Token
     )
     $url = $pvwaAddress + "/PasswordVault/API/Accounts?limit=1"
     $Headers = @{
@@ -219,11 +219,11 @@ Function New-ConnectionToRestAPI {
         [Parameter(Mandatory = $true)]
         $pvwaAddress,
         [Parameter(Mandatory = $true)]
-        [PSCredential]$tinaCreds        
+        [PSCredential]$tinaCreds
     )
     $url = $pvwaAddress + "/PasswordVault/API/auth/Cyberark/Logon"
     $BSTR = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($tinaCreds.Password)
-    
+
     $headerPass = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)
     $body = @{
         username = $tinaCreds.UserName
@@ -249,12 +249,12 @@ Function New-ConnectionToRestAPI {
 }
 
 Function Write-LogMessage {
-    <# 
-.SYNOPSIS 
+    <#
+.SYNOPSIS
 	Method to log a message on screen and in a log file
 
 .DESCRIPTION
-	Logging The input Message to the Screen and the Log File. 
+	Logging The input Message to the Screen and the Log File.
 	The Message Type is presented in colours on the screen based on the type
 
 .PARAMETER LogFile
@@ -290,32 +290,32 @@ Function Write-LogMessage {
     )
     Try {
         If ($Header) {
-            "=======================================" | Out-File -Append -FilePath $LogFile 
+            "=======================================" | Out-File -Append -FilePath $LogFile
             Write-Host "=======================================" -ForegroundColor Magenta
         }
-        ElseIf ($SubHeader) { 
-            "------------------------------------" | Out-File -Append -FilePath $LogFile 
+        ElseIf ($SubHeader) {
+            "------------------------------------" | Out-File -Append -FilePath $LogFile
             Write-Host "------------------------------------" -ForegroundColor Magenta
         }
-		
+
         $msgToWrite = "[$(Get-Date -Format "yyyy-MM-dd hh:mm:ss")]`t"
         $writeToFile = $true
         # Replace empty message with 'N/A'
         if ([string]::IsNullOrEmpty($Msg)) { $Msg = "N/A" }
-		
+
         # Mask Passwords
         if ($Msg -match '((?:password|credentials|secret)\s{0,}["\:=]{1,}\s{0,}["]{0,})(?=([\w`~!@#$%^&*()-_\=\+\\\/|;:\.,\[\]{}]+))') {
             $Msg = $Msg.Replace($Matches[2], "****")
         }
         # Check the message type
         switch ($type) {
-            { ($_ -eq "Info") -or ($_ -eq "LogOnly") } { 
+            { ($_ -eq "Info") -or ($_ -eq "LogOnly") } {
                 If ($_ -eq "Info") {
                     Write-Host $MSG.ToString() -ForegroundColor $(If ($Header -or $SubHeader) { "magenta" } Elseif ($Early) { "DarkGray" } Else { "White" })
                 }
                 $msgToWrite += "[INFO]`t$Msg"
             }
-            "Success" { 
+            "Success" {
                 Write-Host $MSG.ToString() -ForegroundColor Green
                 $msgToWrite += "[SUCCESS]`t$Msg"
             }
@@ -327,14 +327,14 @@ Function Write-LogMessage {
                 Write-Host $MSG.ToString() -ForegroundColor Red
                 $msgToWrite += "[ERROR]`t$Msg"
             }
-            "Debug" { 
+            "Debug" {
                 if ($InDebug -or $InVerbose) {
                     Write-Debug $MSG
                     $msgToWrite += "[DEBUG]`t$Msg"
                 }
                 else { $writeToFile = $False }
             }
-            "Verbose" { 
+            "Verbose" {
                 if ($InVerbose) {
                     Write-Verbose -Msg $MSG
                     $msgToWrite += "[VERBOSE]`t$Msg"
@@ -344,8 +344,8 @@ Function Write-LogMessage {
         }
 
         If ($writeToFile) { $msgToWrite | Out-File -Append -FilePath $LogFile }
-        If ($Footer) { 
-            "=======================================" | Out-File -Append -FilePath $LogFile 
+        If ($Footer) {
+            "=======================================" | Out-File -Append -FilePath $LogFile
             Write-Host "=======================================" -ForegroundColor Magenta
         }
     }
@@ -359,21 +359,21 @@ function ReadFromRegistry([string]$key, [string]$name) {
         If (! (Test-Path $key)) {
             return $null
         }
-        $rc = (Get-ItemProperty -path $key -name $name -ErrorAction SilentlyContinue).$name 
+        $rc = (Get-ItemProperty -path $key -name $name -ErrorAction SilentlyContinue).$name
         return $rc
     }
     Catch {
         Write-Host "Failed to read registry value of parameter name: $name in key: $key" -ForegroundColor red
         return $false > $null
     }
-}   
+}
 
 function Get-PSMDirectory() {
     Try {
         $key = "HKLM:\SOFTWARE\Wow6432Node\CyberArk\CyberArk Privileged Session Manager\"
         $PSM_INSTALL_DIREC = ReadFromRegistry $key "HomeDirectory"
         if (-not $PSM_INSTALL_DIREC) {
-            return $false > $null 
+            return $false > $null
         }
     }
     Catch {
@@ -402,14 +402,14 @@ function New-PSMApplicationElement {
         [Parameter(Mandatory = $false)]
         [string]$SessionType = $null
     )
-    
+
     $Element = $Xml.CreateElement($EntryType)
     $Element.SetAttribute("Name", $Name)
     $Element.SetAttribute("Type", $FileType)
     $Element.SetAttribute("Path", $Path)
     $Element.SetAttribute("Method", $Method)
     If ($SessionType) {
-        $Element.SetAttribute("SessionType", $SessionType) 
+        $Element.SetAttribute("SessionType", $SessionType)
     }
     Return $Element
 }
@@ -422,7 +422,7 @@ function New-XmlComment {
         [Parameter(Mandatory = $true)]
         [string]$Comment
     )
-    
+
     $Element = $Xml.CreateComment($Comment)
     Return $Element
 }
@@ -438,13 +438,13 @@ function Install-Chromium {
         [ValidateSet("Google Chrome", "Microsoft Edge")]
         [string]$Type
     )
-    
+
     Write-LogMessage -type Verbose -MSG "Downloading $Type"
     $ProgressPreference = "SilentlyContinue" # https://github.com/PowerShell/PowerShell/issues/13414
     Invoke-WebRequest $DownloadUrl -OutFile $OutFile
     $ProgressPreference = "Continue"
     Write-LogMessage -type Verbose -MSG "Installing $Type"
-    $ChromiumInstallResult = Start-Process -Wait msiexec.exe -ArgumentList "/qb!", "/i", $OutFile -PassThru 
+    $ChromiumInstallResult = Start-Process -Wait msiexec.exe -ArgumentList "/qb!", "/i", $OutFile -PassThru
     If ($ChromiumInstallResult.ExitCode -ne 0) {
         Write-LogMessage -type Error -MSG "$Type installation failed. Please resolve the issue or install $Type manually and try again."
         Write-LogMessage -type Error -MSG "The $Type installation MSI is located at $OutFile"
@@ -566,11 +566,11 @@ Function Set-GenericMmcConnectionComponent {
         # Extract ZIP to temp folder logic
         $TempGuid = [guid]::NewGuid().ToString()
         $tempFolder = $env:temp + "\CC-$ComponentName-$TempGuid"
-    
-        #Remove folder if it exists already before unzipping 
+
+        #Remove folder if it exists already before unzipping
         if (Test-Path $tempFolder) {
             Remove-Item -Recurse $tempFolder -Force
-        }	
+        }
         #Unzip to temp folder
         $null = Expand-Archive $ComponentZipFile -DestinationPath $tempFolder
 
@@ -580,7 +580,7 @@ Function Set-GenericMmcConnectionComponent {
         #Read XML file
         $xmlContent = New-Object System.Xml.XmlDocument
         $xmlContent.Load($fileEntries[0].FullName)
-        
+
         # Modify CC
         If ($SupportGPMC) {
             $Element = ($xmlContent.ConnectionComponent.TargetSettings.ClientSpecific.SelectSingleNode("/ConnectionComponent/TargetSettings/ClientSpecific/Parameter[@Name='LogonFlag']"))
@@ -590,13 +590,13 @@ Function Set-GenericMmcConnectionComponent {
         $Element.SetAttribute("Value", $MSCPath)
         $xmlContent.ConnectionComponent.SetAttribute("DisplayName", $ComponentDisplayName)
         $xmlContent.ConnectionComponent.SetAttribute("Id", $ComponentName)
-            
+
         # Save modified XML
         $xmlContent.Save($fileEntries[0].FullName)
-            
+
         # Zip the file back again.
         Compress-Archive -DestinationPath $TargetComponentZipFile -Path $tempFolder\*.xml -Force
-            
+
         #Delete temporary Files
         Remove-Item $tempFolder -Recurse
     }
@@ -620,11 +620,11 @@ Function Set-HTML5Parameter {
         # Extract ZIP to temp folder logic
         $TempGuid = [guid]::NewGuid().ToString()
         $tempFolder = $env:temp + "\CC-$ComponentName-$TempGuid"
-    
-        #Remove folder if it exists already before unzipping 
+
+        #Remove folder if it exists already before unzipping
         if (Test-Path $tempFolder) {
             Remove-Item -Recurse $tempFolder -Force
-        }	
+        }
         #Unzip to temp folder
         $null = Expand-Archive $ComponentZipFile -DestinationPath $tempFolder
 
@@ -634,7 +634,7 @@ Function Set-HTML5Parameter {
         #Read XML file
         $xmlContent = New-Object System.Xml.XmlDocument
         $xmlContent.Load($fileEntries[0].FullName)
-        
+
         # Modify CC
 
         $HTML5Element = $xmlContent.CreateElement("Parameter")
@@ -651,13 +651,13 @@ Function Set-HTML5Parameter {
         }
         $UserParametersElement = ($xmlContent.ConnectionComponent.TargetSettings.ClientSpecific.SelectSingleNode("/ConnectionComponent/UserParameters"))
         $null = $UserParametersElement.AppendChild($HTML5Element)
-            
+
         # Save modified XML
         $xmlContent.Save($fileEntries[0].FullName)
-            
+
         # Zip the file back again.
         Compress-Archive -DestinationPath $TargetComponentZipFile -Path $tempFolder\*.xml -Force
-            
+
         #Delete temporary Files
         Remove-Item $tempFolder -Recurse
     }
@@ -703,6 +703,7 @@ $ScriptLocation = Split-Path -Parent $MyInvocation.MyCommand.Path
 $global:LOG_FILE_PATH = "$ScriptLocation\_Add-PSMApplication.log"
 $global:HTML5 = $HTML5
 
+$AppLockerUpdated = $false
 $CurrentDirectory = (Get-Location).Path
 $PSMInstallationFolder = Get-PSMDirectory
 $BackupSuffix = (Get-Date).ToString('yyyMMdd-HHmmss')
@@ -761,7 +762,7 @@ switch ($Application) {
         continue
     }
     Default {
-        $tinaCreds = Get-Credential -Message "Please enter CyberArk credentials to import connection components or cancel to skip." 
+        $tinaCreds = Get-Credential -Message "Please enter CyberArk credentials to import connection components or cancel to skip."
         if ($tinaCreds) {
             Write-LogMessage -type Verbose -MSG "Logging in to CyberArk"
             $pvwaToken = New-ConnectionToRestAPI -pvwaAddress $PortalUrl -tinaCreds $tinaCreds
@@ -791,18 +792,18 @@ $MmcAppsTest = $Application | Where-Object { $ListMmcApps -contains $_ }
 if ($MmcAppsTest) {
     Write-LogMessage -type Info -MSG "Installing dispatcher"
     Expand-Archive -Path "$CurrentDirectory\Supplemental\GenericMmc\Dispatcher.zip" -DestinationPath "$PSMInstallationFolder\Components\" -Force
-    
+
     Write-LogMessage -type Info -MSG "Adding MMC and dispatcher to AppLocker configuration"
     $AppLockerEntries = @(
         (New-PSMApplicationElement -Xml $xml -EntryType Application -Name MMC -FileType Exe -Path "C:\Windows\System32\MMC.exe" -Method Hash)
     )
     Add-PSMConfigureAppLockerSection -SectionName "Microsoft Management Console (MMC)" -XmlDoc ([REF]$xml) -AppLockerEntries $AppLockerEntries
-    
+
     $AppLockerEntries = @(
         (New-PSMApplicationElement -Xml $xml -EntryType Application -Name PSM-MMCDispatcher -FileType Exe -Path "$PSMInstallationFolder\Components\PSMMMCDispatcher.exe" -Method Hash)
     )
     Add-PSMConfigureAppLockerSection -SectionName "PSM Generic MMC Dispatcher" -XmlDoc ([REF]$xml) -AppLockerEntries $AppLockerEntries
-    
+
     Write-LogMessage -type Info -MSG "Installing MSC Files"
     If (!(Test-Path -Path "C:\PSMApps" -PathType Container)) {
         try {
@@ -945,7 +946,7 @@ switch ($Application) {
 
         Write-LogMessage -type Info -MSG "Installing Generic MMC dispatcher"
         Expand-Archive -Path "$CurrentDirectory\Supplemental\GenericMmc\Dispatcher.zip" -DestinationPath $PSMInstallationFolder\Components\ -Force
-        
+
         $Tasks += "GenericMMC:"
         $Tasks += " - Create $MSCPath"
         $Tasks += " - Add the `"$ComponentDisplayName`" connection component to applicable domain platforms"
@@ -969,7 +970,7 @@ switch ($Application) {
                 Exit 1
             }
         }
-    
+
         Expand-Archive -Path $ZipPath -DestinationPath $TempDir -Force
 
         $TargetComponentZipFile = "$TempDir\CC-TOTPToken.zip"
@@ -1005,7 +1006,7 @@ switch ($Application) {
             (New-PSMApplicationElement -Xml $xml -EntryType Application -Name SSMS18-Profiler -FileType Exe -Path "C:\Program Files (x86)\Microsoft SQL Server Management Studio 18\Common7\Profiler.exe" -Method Publisher)
         )
         Add-PSMConfigureAppLockerSection -SectionName "SQL Management Studio 18" -XmlDoc ([REF]$xml) -AppLockerEntries $AppLockerEntries
-        
+
         $AppLockerEntries = @(
             (New-PSMApplicationElement -Xml $xml -EntryType Libraries -Name SSMS18-Debugger -FileType Dll -Path "C:\Program Files (x86)\Microsoft SQL Server Management Studio 18\Common7\Packages\Debugger\*" -Method Path)
         )
@@ -1022,7 +1023,7 @@ switch ($Application) {
             (New-PSMApplicationElement -Xml $xml -EntryType Application -Name SSMS19-Profiler -FileType Exe -Path "C:\Program Files (x86)\Microsoft SQL Server Management Studio 19\Common7\Profiler.exe" -Method Publisher)
         )
         Add-PSMConfigureAppLockerSection -SectionName "SQL Management Studio 19" -XmlDoc ([REF]$xml) -AppLockerEntries $AppLockerEntries
-        
+
         $AppLockerEntries = @(
             (New-PSMApplicationElement -Xml $xml -EntryType Libraries -Name SSMS19-Debugger -FileType Dll -Path "C:\Program Files (x86)\Microsoft SQL Server Management Studio 19\Common7\Packages\Debugger\*" -Method Path)
         )
@@ -1170,7 +1171,7 @@ switch ($Application) {
             $RunHardening = $true
         }
         $Path = "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
-    
+
         $AppLockerEntries = @(
                 (New-PSMApplicationElement -Xml $xml -EntryType Application -Name MicrosoftEdge -FileType Exe -Path $Path -Method Publisher)
         )
