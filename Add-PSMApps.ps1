@@ -949,25 +949,26 @@ switch ($Application) {
         $CreatedTask = $false
         $WebDriverUpdaterExeFile = "$WebDriverUpdaterPath\WebDriverUpdater.exe"
         $WebDriverUpdaterConfigFile = "$WebDriverUpdaterPath\WebDriverUpdater.exe.Config"
-        Write-LogMessage -type Info -MSG "Updating WebDriverUpdater configuration file at $WebDriverUpdaterConfigFile"
+        Write-LogMessage -type Info -MSG "Configuring WebDriverUpdater"
+        Write-LogMessage -type Verbose -MSG "Updating WebDriverUpdater configuration file at $WebDriverUpdaterConfigFile"
         $CPMInstallDirectory = Get-CPMInstallDirectory
-        $CPMBinDirectory = "$CPMInstallDirectory\bin"
-        $PSMComponentsDirectory = "$PSMInstallationFolder\Components"
-        $PSMScriptsDirectory = "$PSMInstallationFolder\Scripts"
         $WebDriverUpdaterConfigXml = New-Object System.Xml.XmlDocument
         $WebDriverUpdaterConfigXml.load($WebDriverUpdaterConfigFile)
         If ($PSMInstallationFolder) {
             Write-LogMessage -type Verbose -MSG "Updating PathToPSMDrivers"
+            $PSMComponentsDirectory = "$PSMInstallationFolder\Components"
+            $PSMScriptsDirectory = "$PSMInstallationFolder\Scripts"
             $PSMComponentsKey = $WebDriverUpdaterConfigXml.configuration.appSettings.add | Where-Object key -eq "PathToPSMDrivers"
             $PSMComponentsKey.SetAttribute("value", $PSMComponentsDirectory)
-
+            
             Write-LogMessage -type Verbose -MSG "Updating PathToUpdateAppLockerRuleScript"
             $PSMScriptsKey = $WebDriverUpdaterConfigXml.configuration.appSettings.add | Where-Object key -eq "PathToUpdateAppLockerRuleScript"
             $PSMScriptsKey.SetAttribute("value", $PSMScriptsDirectory)
-
+            
             $WebDriverUpdaterChangedXml = $true
         }
-        if ($CPMBinDirectory) {
+        if ($CPMInstallDirectory) {
+            $CPMBinDirectory = "$CPMInstallDirectory\bin"
             Write-LogMessage -type Verbose -MSG "Updating PathToCPMDrivers"
             $CPMBinKey = $WebDriverUpdaterConfigXml.configuration.appSettings.add | Where-Object key -eq "PathToCPMDrivers"
             $CPMBinKey.SetAttribute("value", $CPMBinDirectory)
@@ -988,7 +989,7 @@ switch ($Application) {
             Write-LogMessage -type Error -MSG "Failed to detect either PSM or CPM installation directories. Please configure WebDriverUpdater.exe.config manually."
             $Tasks += ("Update {0}" -f $WebDriverUpdaterConfigFile)
         }
-        Write-LogMessage -type Info -MSG "Creating/updating WebDriverUpdater scheduled task"
+        Write-LogMessage -type Verbose -MSG "Creating/updating WebDriverUpdater scheduled task"
 
         # Can't create a daily repeating task trigger so create a repeating trigger and copy its Repetition setting to the actual task.
         $OneDay = New-TimeSpan -Days 1
@@ -1010,13 +1011,13 @@ switch ($Application) {
         try {
             $CurrentTask = Get-ScheduledTask -TaskName "CyberArk - Update Web Drivers"
             If ($CurrentTask) {
-                Write-LogMessage -type Info -MSG "Scheduled task already exists, it will be exported and removed."
+                Write-LogMessage -type Warning -MSG "Scheduled task already exists, it will be exported and removed."
                 Export-ScheduledTask -TaskName "CyberArk - Update Web Drivers" | Out-File ("OldWebDriverUpdaterTask-{0}.xml" -f $BackupSuffix)
                 Unregister-ScheduledTask -TaskName "CyberArk - Update Web Drivers" -Confirm:$false
             }
-            Write-LogMessage -type Info -MSG "Creating scheduled task: `"CyberArk - Update Web Drivers`""
+            Write-LogMessage -type Verbose -MSG "Creating scheduled task: `"CyberArk - Update Web Drivers`""
             $CreatedTask = Register-ScheduledTask -InputObject $TaskConfiguration -TaskName "CyberArk - Update Web Drivers"
-            Write-LogMessage -type Info -MSG "Created hourly scheduled task: `"CyberArk - Update Web Drivers`""
+            Write-LogMessage -type Info -MSG "Configured WebDriverUpdater, created hourly scheduled task `"CyberArk - Update Web Drivers`" and executed the task"
         }
         catch {
             Write-LogMessage -type Error -MSG "Failed to register scheduled task. Please do so manually."
@@ -1024,7 +1025,7 @@ switch ($Application) {
         }
         If ($CreatedTask) {
             try {
-                Write-LogMessage -type Info -MSG "Executing task"
+                Write-LogMessage -type Verbose -MSG "Executing created WebDriverUpdater task"
                 $null = Start-ScheduledTask -TaskName "CyberArk - Update Web Drivers"
                 $Tasks += "Verify that drivers have updated successfully"
             }
