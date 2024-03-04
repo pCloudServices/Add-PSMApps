@@ -741,6 +741,8 @@ If ("SqlMgmtStudio19" -in $Application) {
     }
 }
 
+# All tests ok. Start work.
+
 $RunHardening = $false
 
 # Load the current XML
