@@ -955,6 +955,7 @@ switch ($Application) {
         $Tasks += "GenericMMC:"
         $Tasks += " - Create $MSCPath"
         $Tasks += " - Add the `"$ComponentDisplayName`" connection component to applicable domain platforms"
+        $AppLockerUpdated = $true
     }
     "TOTPToken" {
         $ZipPath = "$CurrentDirectory\PSM-TOTPToken.zip"
@@ -1002,6 +1003,7 @@ switch ($Application) {
         $Tasks += "TOTPToken:"
         $Tasks += "- Import a platform supporting MFADeviceKeys-*.zip"
         $Tasks += "- Associate the TOTP Token connection component with an appropriate platform"
+        $AppLockerUpdated = $true
     }
     "SqlMgmtStudio18" {
         Write-LogMessage -type Info -MSG "SqlMgmtStudio18: Modifying AppLocker configuration"
@@ -1019,6 +1021,7 @@ switch ($Application) {
         $Tasks += "SqlMgmtStudio18:"
         $Tasks += " - Create/Configure SQL Management Studio connection components"
         $Tasks += " - - Set ClientInstallationPath in your connection component to C:\Program Files (x86)\Microsoft SQL Server Management Studio 18\Common7\IDE\Ssms.exe"
+        $AppLockerUpdated = $true
     }
     "SqlMgmtStudio19" {
         Write-LogMessage -type Info -MSG "SqlMgmtStudio19: Modifying AppLocker configuration"
@@ -1037,6 +1040,7 @@ switch ($Application) {
         $Tasks += " - Create/Configure SQL Management Studio connection components"
         $Tasks += " - - Set ClientInstallationPath in your connection component to C:\Program Files (x86)\Microsoft SQL Server Management Studio 19\Common7\IDE\Ssms.exe"
         $Tasks += " - - You may need to disable `"Lock Application Window`" to support SSMS19"
+        $AppLockerUpdated = $true
     }
     # Google Chrome 32 bit
     "GoogleChromeX86" {
@@ -1071,6 +1075,7 @@ switch ($Application) {
             (New-PSMApplicationElement -Xml $xml -EntryType Application -Name GoogleChrome -FileType Exe -Path $Path -Method Publisher)
         )
         Add-PSMConfigureAppLockerSection -SectionName "Google Chrome" -XmlDoc ([REF]$xml) -AppLockerEntries $AppLockerEntries
+        $AppLockerUpdated = $true
     }
     # Google Chrome 64 bit
     "GoogleChromeX64" {
@@ -1105,6 +1110,7 @@ switch ($Application) {
             (New-PSMApplicationElement -Xml $xml -EntryType Application -Name GoogleChrome -FileType Exe -Path $Path -Method Publisher)
         )
         Add-PSMConfigureAppLockerSection -SectionName "Google Chrome" -XmlDoc ([REF]$xml) -AppLockerEntries $AppLockerEntries
+        $AppLockerUpdated = $true
     }
 
     # Microsoft Edge 64 bit
@@ -1143,6 +1149,7 @@ switch ($Application) {
             (New-PSMApplicationElement -Xml $xml -EntryType Application -Name MicrosoftEdge -FileType Exe -Path $Path -Method Publisher)
         )
         Add-PSMConfigureAppLockerSection -SectionName "Microsoft Edge" -XmlDoc ([REF]$xml) -AppLockerEntries $AppLockerEntries
+        $AppLockerUpdated = $true
     }
 
     # Microsoft Edge 32 bit
@@ -1181,22 +1188,25 @@ switch ($Application) {
                 (New-PSMApplicationElement -Xml $xml -EntryType Application -Name MicrosoftEdge -FileType Exe -Path $Path -Method Publisher)
         )
         Add-PSMConfigureAppLockerSection -SectionName "Microsoft Edge" -XmlDoc ([REF]$xml) -AppLockerEntries $AppLockerEntries
+        $AppLockerUpdated = $true
     }
-    
 }
 
-try { Copy-Item -Force $AppLockerXmlFilePath $BackupAppLockerXmlFilePath }
-catch { 
-    Write-LogMessage -type Error -MSG "Backup of current PSMConfigureAppLocker.xml failed. Aborting."
-    exit 1
+If ($AppLockerUpdated) {
+    try {
+        Copy-Item -Force $AppLockerXmlFilePath $BackupAppLockerXmlFilePath
+    }
+    catch {
+        Write-LogMessage -type Error -MSG "Backup of current PSMConfigureAppLocker.xml failed. Aborting."
+        exit 1
+    }
+    $xml.Save($AppLockerXmlFilePath)
+    Write-LogMessage -Type Info -MSG "Running PSM Configure AppLocker script"
+    Write-LogMessage -Type Info -MSG "---"
+    Invoke-PSMConfigureAppLocker -psmRootInstallLocation $PSMInstallationFolder
+    Write-LogMessage -Type Info -MSG "---"
+    Write-LogMessage -Type Info -MSG "End of PSM Configure AppLocker script output"
 }
-$xml.Save($AppLockerXmlFilePath)
-Write-LogMessage -Type Info -MSG "Running PSM Configure AppLocker script"
-Write-LogMessage -Type Info -MSG "---"
-Invoke-PSMConfigureAppLocker -psmRootInstallLocation $PSMInstallationFolder
-Write-LogMessage -Type Info -MSG "---"
-Write-LogMessage -Type Info -MSG "End of PSM Configure AppLocker script output"
-    
 If ($RunHardening) {
     Write-LogMessage -Type Info -MSG "Running PSM Hardening script"
     Write-LogMessage -Type Info -MSG "---"
