@@ -738,7 +738,7 @@ If ("WebDriverUpdater" -in $Application) {
     (Test-Path -PathType Leaf -Path "$WebDriverUpdaterPath\WebDriverUpdater.exe.config") -and `
     (Test-Path -PathType Leaf -Path "$WebDriverUpdaterPath\WebDriverUpdater.exe")
     If ($false -eq $Result) {
-        Write-Error "Web Driver Updater files not found in $WebDriverUpdaterPath. Exiting."
+        Write-LogMessage -type Error -MSG "Web Driver Updater files not found in $WebDriverUpdaterPath. Exiting."
         exit 1
     }
 }
@@ -1011,7 +1011,7 @@ switch ($Application) {
         try {
             $CurrentTask = Get-ScheduledTask -TaskName "CyberArk - Update Web Drivers"
             If ($CurrentTask) {
-                Write-LogMessage -type Warning -MSG "Scheduled task already exists, it will be exported and removed."
+                Write-LogMessage -type Warning -MSG ("Scheduled task already exists, it will be exported to OldWebDriverUpdaterTask-{0}.xml and removed." -f $BackupSuffix)
                 Export-ScheduledTask -TaskName "CyberArk - Update Web Drivers" | Out-File ("OldWebDriverUpdaterTask-{0}.xml" -f $BackupSuffix)
                 Unregister-ScheduledTask -TaskName "CyberArk - Update Web Drivers" -Confirm:$false
             }
