@@ -969,7 +969,8 @@ switch ($Application) {
                 $PSMScriptsKey.SetAttribute("value", $PSMScriptsDirectory)
                 
                 $WebDriverUpdaterChangedXml = $true
-            } else {
+            }
+            else {
                 Write-LogMessage -type Error -MSG "AppLocker update script not found, which may indicate an unsupported version of PSM. Skipping PSM configuration."
             }
         }
