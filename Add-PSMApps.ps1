@@ -388,7 +388,7 @@ function Get-PSMDirectory() {
 
 function Get-CPMInstallDirectory {
     try {
-        $Path = (Get-CimInstance -ClassName win32_service | Where-Object { $_.Name -match 'CyberArk Password Manager' } ).PathName -replace "\\PMEngine.exe.*", "" -replace "`"",""
+        $Path = (Get-CimInstance -ClassName win32_service | Where-Object { $_.Name -match 'CyberArk Password Manager' } ).PathName -replace "\\PMEngine.exe.*", "" -replace "`"", ""
         return $Path
     }
     catch {
