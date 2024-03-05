@@ -1016,10 +1016,10 @@ switch ($Application) {
         $TaskConfiguration = New-ScheduledTask -Action $TaskAction -Settings $TaskSettings -Trigger $TaskTrigger -Principal $TaskPrincipal
 
         try {
-            $CurrentTask = Get-ScheduledTask -TaskName "CyberArk - Update Web Drivers"
+            $CurrentTask = Get-ScheduledTask -TaskName "CyberArk - Update Web Drivers" -ErrorAction SilentlyContinue
             If ($CurrentTask) {
-                Write-LogMessage -type Warning -MSG ("Scheduled task already exists, it will be exported to OldWebDriverUpdaterTask-{0}.xml and removed." -f $BackupSuffix)
-                Export-ScheduledTask -TaskName "CyberArk - Update Web Drivers" | Out-File ("OldWebDriverUpdaterTask-{0}.xml" -f $BackupSuffix)
+                Write-LogMessage -type Warning -MSG ("Scheduled task already exists, it will be exported to OldWebDriverUpdaterTask- { 0 }.xml and removed." -f $BackupSuffix)
+                Export-ScheduledTask -TaskName "CyberArk - Update Web Drivers" | Out-File ("OldWebDriverUpdaterTask- { 0 }.xml" -f $BackupSuffix)
                 Unregister-ScheduledTask -TaskName "CyberArk - Update Web Drivers" -Confirm:$false
             }
             Write-LogMessage -type Verbose -MSG "Creating scheduled task: `"CyberArk - Update Web Drivers`""
