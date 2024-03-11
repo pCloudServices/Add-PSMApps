@@ -1,21 +1,21 @@
-# Add-PSMApplication
+# Add-PSMApps
 
 ## Information
 Script to assist in configuration of custom connection components
 
 The script is provided in a zip file containing:
 - Readme.md file
-- Add-PSMApplication.ps1 - script to run
+- Add-PSMApps.ps1 - script to run
 - Supplemental - directory containing additional files as needed to support connection component creation
 
 ## Usage
-PS C:\> .\Add-PSMApplication.ps1 -Application `(Comma-separated list of applications to configure)`
+PS C:\> .\Add-PSMApps.ps1 -Application `(Comma-separated list of applications to configure)`
 
 The script will prompt for credentials for the _admin account or installeruser account, to import required components to the Privilege Cloud platform. This only needs to be supplied once, and can be skipped when executing the script on additional connector servers.
 
 ## Parameters
 ### Mandatory Parameters
-Add-PSMApplication will prompt for these if not provided on the command line
+Add-PSMApps will prompt for these if not provided on the command line
 
 | Parameter     | Description  	                                          |
 | ---           | ---	                                                    |
@@ -49,6 +49,7 @@ If `-HTML5` is omitted, or set to Default, the AllowSelectHTML5 user parameter w
 | SqlMgmtStudio18       | No                      | Microsoft SQL Management Studio 18                      |
 | SqlMgmtStudio19       | No                      | Microsoft SQL Management Studio 19                      |
 | TOTPToken             | No                      | CyberArk TOTP MFA Code Generator Connection Component   |
+| WebDriverUpdater      | No                      | Configure and schedule CyberArk Web Driver Updater tool |
 
 See below for further information on operations performed for each component.
 
@@ -92,13 +93,20 @@ Any instances of `{address}` in ClientInstallationPath will be replaced with the
 
 #### Microsoft SQL Management Studio 18/19
 - Adds required EXE and DLL files to AppLocker configuration
-- Does not install SSMS - this must be installed manually before running Add-PSMApplication
+- Does not install SSMS - this must be installed manually before running Add-PSMApps
 - The required connection component already exists by default in Privilege Cloud for Windows Authentication
 - Database Authentication support requires connection component from CyberArk Marketplace
 
 #### TOTPToken
-- Requires the component zip to be downloaded from the marketplace and placed in the same folder as Add-PSMApplication
+- Requires the component zip to be downloaded from the marketplace and placed in the same folder as Add-PSMApps
   - https://cyberark.my.site.com/mplace/s/#a352J000000GPw5QAG-a392J000002hZX8QAM
 - Adds required EXE and DLL files to AppLocker configuration
 - Imports Connection Component
 
+#### WebDriverUpdater
+- Requires WebDriverUpdater
+  - Download from https://cyberark.my.site.com/mplace/s/#a35Ht000000rjXlIAI-a39Ht000001kceVIAQ
+  - Extract to a permanent location
+  - Provide the path with the `-WebDriverUpdaterPath` or `-WDUPath` parameter
+- Configures WebDriverUpdater.exe.config with the locations of PSM and/or CPM
+- Creates a scheduled task to run the updater every hour
