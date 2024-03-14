@@ -837,6 +837,8 @@ if ($MmcAppsTest) {
     )
     Add-PSMConfigureAppLockerSection -SectionName "PSM Generic MMC Dispatcher" -XmlDoc ([REF]$xml) -AppLockerEntries $AppLockerEntries
 
+    $AppLockerUpdated = $true
+
     Write-LogMessage -type Info -MSG "Installing MSC Files"
     If (!(Test-Path -Path "C:\PSMApps" -PathType Container)) {
         try {
