@@ -29,7 +29,7 @@ param (
     $WebDriverUpdaterPath
 )
 
-# Version: 1.1.1
+# Version: 1.1.2
 
 Function Add-PSMConfigureAppLockerSection {
     [CmdletBinding()]
@@ -495,7 +495,9 @@ Function Invoke-PSMHardening {
     $hardeningScriptRoot = "$psmRootInstallLocation\Hardening"
     $CurrentLocation = Get-Location
     Set-Location $hardeningScriptRoot
+    Set-PSDebug -Strict:$False
     & "$hardeningScriptRoot\PSMHardening.ps1"
+    Set-PSDebug -Strict:$False
     Set-Location $CurrentLocation
 }
 
@@ -516,7 +518,9 @@ Function Invoke-PSMConfigureAppLocker {
     $hardeningScriptRoot = "$psmRootInstallLocation\Hardening"
     $CurrentLocation = Get-Location
     Set-Location $hardeningScriptRoot
+    Set-PSDebug -Strict:$False
     & "$hardeningScriptRoot\PSMConfigureAppLocker.ps1"
+    Set-PSDebug -Strict:$False
     Set-Location $CurrentLocation
 }
 
