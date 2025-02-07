@@ -1219,10 +1219,12 @@ switch -regex ($Application) {
             $RunHardening = $true
         }
 
-        $Path = "C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"
+        $BrowserPath = "C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"
+        $DriverPath = "$PSMComponentsDirectory\chromedriver.exe"
 
         $AppLockerEntries = @(
-            (New-PSMApplicationElement -Xml $xml -EntryType Application -Name GoogleChrome -FileType Exe -Path $Path -Method Publisher)
+            (New-PSMApplicationElement -Xml $xml -EntryType Application -Name GoogleChrome -FileType Exe -Path $BrowserPath -Method Publisher),
+            (New-PSMApplicationElement -Xml $xml -EntryType Application -Name GoogleChromeDriver -FileType Exe -Path $DriverPath -Method Hash)
         )
         Add-PSMConfigureAppLockerSection -SectionName "Google Chrome" -XmlDoc ([REF]$xml) -AppLockerEntries $AppLockerEntries
         $AppLockerUpdated = $true
@@ -1255,10 +1257,12 @@ switch -regex ($Application) {
             Enable-PSMWebAppSupport -psmRootInstallLocation $PSMInstallationFolder -BackupFile $BackupHardeningXmlFilePath
             $RunHardening = $true
         }
-        $Path = "C:\Program Files\Google\Chrome\Application\chrome.exe"
+        $BrowserPath = "C:\Program Files\Google\Chrome\Application\chrome.exe"
+        $DriverPath = "$PSMComponentsDirectory\chromedriver.exe"
 
         $AppLockerEntries = @(
-            (New-PSMApplicationElement -Xml $xml -EntryType Application -Name GoogleChrome -FileType Exe -Path $Path -Method Publisher)
+            (New-PSMApplicationElement -Xml $xml -EntryType Application -Name GoogleChrome -FileType Exe -Path $BrowserPath -Method Publisher),
+            (New-PSMApplicationElement -Xml $xml -EntryType Application -Name GoogleChromeDriver -FileType Exe -Path $DriverPath -Method Hash)
         )
         Add-PSMConfigureAppLockerSection -SectionName "Google Chrome" -XmlDoc ([REF]$xml) -AppLockerEntries $AppLockerEntries
         $AppLockerUpdated = $true
