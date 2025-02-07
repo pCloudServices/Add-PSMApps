@@ -96,6 +96,18 @@ Function Add-PSMConfigureAppLockerSection {
     }
 }
 
+Function Write-Heading {
+    <#
+    .PARAMETER String
+    String to wrap
+    #>
+
+    param($String)
+    Write-LogMessage -type Info -MSG ("-" * $String.Length)
+    Write-LogMessage -type Info -MSG $String
+    Write-LogMessage -type Info -MSG ("-" * $String.Length)
+}
+
 Function Import-PSMConnectionComponent {
     <#
     .SYNOPSIS
@@ -953,6 +965,7 @@ if ($MmcAppsTest) {
 switch -regex ($Application) {
     # Web Driver Updater
     "WebDriverUpdater" {
+        Write-Heading -String "Web Driver Updater"
         $CreatedTask = $false
         $WebDriverUpdaterExeFile = "$WebDriverUpdaterPath\WebDriverUpdater.exe"
         $WebDriverUpdaterConfigFile = "$WebDriverUpdaterPath\WebDriverUpdater.exe.Config"
@@ -962,7 +975,6 @@ switch -regex ($Application) {
         $WebDriverUpdaterConfigXml = New-Object System.Xml.XmlDocument
         $WebDriverUpdaterConfigXml.load($WebDriverUpdaterConfigFile)
         If ($PSMInstallationFolder) {
-            $PSMComponentsDirectory = "$PSMInstallationFolder\Components"
             $PSMScriptsDirectory = "$PSMInstallationFolder\Scripts"
             $PSMUpdateAppLockerScriptPath = "$PSMScriptsDirectory\UpdateApplockerRule.ps1"
             $PSMUpdateAppLockerScriptExists = Test-Path -Type Leaf -Path $PSMUpdateAppLockerScriptPath
@@ -1050,6 +1062,7 @@ switch -regex ($Application) {
     }
     # Generic MMC connector
     "GenericMMC" {
+        Write-Heading -String "Generic MMC"
         if ($tinaCreds) {
             $ComponentZipFile = "$CurrentDirectory\Supplemental\GenericMmc\ConnectionComponent.zip"
             $TargetComponentZipFile = $env:temp + "\CC-" + (Get-Date -UFormat '%Y%m%d%H%M%S') + ".zip"
@@ -1090,6 +1103,7 @@ switch -regex ($Application) {
         $AppLockerUpdated = $true
     }
     "TOTPToken" {
+        Write-Heading -String "TOTP Token"
         $ZipPath = "$CurrentDirectory\PSM-TOTPToken.zip"
         If (!(Test-Path $ZipPath)) {
             Write-LogMessage -type Error -MSG "Please download PSM-TOTPToken.zip from https://cyberark-customers.force.com/mplace/s/#a352J000000GPw5QAG-a392J000002hZX8QAM and place it in $CurrentDirectory"
@@ -1138,6 +1152,7 @@ switch -regex ($Application) {
         $AppLockerUpdated = $true
     }
     "SqlMgmtStudio18" {
+        Write-Heading -String "SQL Server Management Studio 18"
         Write-LogMessage -type Info -MSG "SqlMgmtStudio18: Modifying AppLocker configuration"
         $AppLockerEntries = @(
             (New-PSMApplicationElement -Xml $xml -EntryType Application -Name SSMS18 -FileType Exe -Path "C:\Program Files (x86)\Microsoft SQL Server Management Studio 18\Common7\IDE\Ssms.exe" -Method Publisher),
@@ -1156,6 +1171,7 @@ switch -regex ($Application) {
         $AppLockerUpdated = $true
     }
     "SqlMgmtStudio19" {
+        Write-Heading -String "SQL Server Management Studio 19"
         Write-LogMessage -type Info -MSG "SqlMgmtStudio19: Modifying AppLocker configuration"
         $AppLockerEntries = @(
             (New-PSMApplicationElement -Xml $xml -EntryType Application -Name SSMS19 -FileType Exe -Path "C:\Program Files (x86)\Microsoft SQL Server Management Studio 19\Common7\IDE\Ssms.exe" -Method Publisher),
@@ -1176,6 +1192,8 @@ switch -regex ($Application) {
     }
     # Google Chrome 32 bit
     "GoogleChromeX86" {
+        Write-Heading -String "Google Chrome x86"
+        Write-LogMessage -type Info -MSG "Checking if Chrome 64 bit is present to avoid conflicts"
         If (Test-Path "C:\Program Files\Google\Chrome\Application\chrome.exe") {
             Write-LogMessage -type Error -MSG "Chrome exists at `"C:\Program Files\Google\Chrome\Application\chrome.exe`""
             Write-LogMessage -type Error -MSG "which is the 64-bit installation path. Please uninstall it and run script again if you"
@@ -1188,7 +1206,7 @@ switch -regex ($Application) {
         else {
             $DownloadUrl = "https://dl.google.com/edgedl/chrome/install/GoogleChromeStandaloneEnterprise.msi"
             $OutFile = "$env:temp\GoogleChromeStandaloneEnterprise.msi"
-            Write-LogMessage -type Info -MSG "Downloading and installing Chrome"
+            Write-LogMessage -type Info -MSG "Downloading and installing Chrome x86"
             $null = Install-Chromium -Type "Google Chrome" -DownloadUrl $DownloadUrl -OutFile $OutFile
         }
         $WebAppSupport = Test-PSMWebAppSupport -psmRootInstallLocation $PSMInstallationFolder
@@ -1211,20 +1229,21 @@ switch -regex ($Application) {
     }
     # Google Chrome 64 bit
     "GoogleChromeX64" {
-        Write-LogMessage -type Info -MSG "Checking if Chrome 32 bit is present"
+        Write-Heading -String "Google Chrome x64"
+        Write-LogMessage -type Info -MSG "Checking if Chrome 32 bit is present to avoid conflicts"
         If (Test-Path "C:\Program Files (x86)\Google\Chrome\Application\chrome.exe") {
             Write-LogMessage -type Error -MSG "Chrome exists at `"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe`""
             Write-LogMessage -type Error -MSG "which is the 32-bit installation path. Please uninstall it and run script again if you"
             Write-LogMessage -type Error -MSG "want to switch to the 64-bit version "
             exit 1
         }
-        If (Test-Path "C:\Program Files (x86)\Google\Chrome\Application\chrome.exe") {
+        If (Test-Path "C:\Program Files\Google\Chrome\Application\chrome.exe") {
             Write-LogMessage -type Info -MSG "Chrome appears to be installed already. Will not reinstall."
         }
         else {
             $DownloadUrl = "https://dl.google.com/edgedl/chrome/install/GoogleChromeStandaloneEnterprise64.msi"
             $OutFile = "$env:temp\GoogleChromeStandaloneEnterprise64.msi"
-            Write-LogMessage -type Info -MSG "Downloading and installing Chrome"
+            Write-LogMessage -type Info -MSG "Downloading and installing Chrome x64"
             $null = Install-Chromium -Type "Google Chrome" -DownloadUrl $DownloadUrl -OutFile $OutFile
         }
         $WebAppSupport = Test-PSMWebAppSupport -psmRootInstallLocation $PSMInstallationFolder
