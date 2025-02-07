@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param (
     [Parameter(Mandatory = $true)]
-    [ValidateSet("MicrosoftEdgeX86", "MicrosoftEdgeX64", "GoogleChromeX86", "GoogleChromeX64", "SqlMgmtStudio18", "SqlMgmtStudio19", "GenericMMC", "TOTPToken", "ADUC", "DNS", "DHCP", "ADDT", "ADSS", "GPMC", "WebDriverUpdater")]
+    [ValidateSet("MicrosoftEdge", "MicrosoftEdgeX86", "MicrosoftEdgeX64", "GoogleChromeX86", "GoogleChromeX64", "SqlMgmtStudio18", "SqlMgmtStudio19", "GenericMMC", "TOTPToken", "ADUC", "DNS", "DHCP", "ADDT", "ADSS", "GPMC", "WebDriverUpdater")]
     [string[]]
     $Application,
     [Parameter(Mandatory = $false)]
@@ -724,6 +724,7 @@ $global:HTML5 = $HTML5
 $AppLockerUpdated = $false
 $CurrentDirectory = (Get-Location).Path
 $PSMInstallationFolder = Get-PSMDirectory
+$PSMComponentsDirectory = "$PSMInstallationFolder\Components"
 $BackupSuffix = (Get-Date).ToString('yyyMMdd-HHmmss')
 
 $AppLockerXmlFilePath = "$PSMInstallationFolder\Hardening\PSMConfigureAppLocker.xml"
@@ -792,7 +793,7 @@ $Tasks = @()
 
 # Only prompt for admin credentials if we need to import connection components.
 
-$ListApplicationsWithoutConnectionComponents = "GoogleChromeX86", "GoogleChromeX64", "SqlMgmtStudio18", "SqlMgmtStudio19", "MicrosoftEdgeX86", "MicrosoftEdgeX64", "WebDriverUpdater"
+$ListApplicationsWithoutConnectionComponents = "GoogleChromeX86", "GoogleChromeX64", "SqlMgmtStudio18", "SqlMgmtStudio19", "MicrosoftEdge", "MicrosoftEdgeX86", "MicrosoftEdgeX64", "WebDriverUpdater"
 
 switch ($Application) {
     { $PSItem -in $ListApplicationsWithoutConnectionComponents } {
@@ -949,7 +950,7 @@ if ($MmcAppsTest) {
     }
 }
 
-switch ($Application) {
+switch -regex ($Application) {
     # Web Driver Updater
     "WebDriverUpdater" {
         $CreatedTask = $false
@@ -1245,25 +1246,15 @@ switch ($Application) {
     }
 
     # Microsoft Edge 64 bit
-    "MicrosoftEdgeX64" {
-        Write-LogMessage -type Info -MSG "Checking if Microsoft Edge 32 bit is present"
-        $Packages = Get-Package | Where-Object TagId -eq "0E72E0CA-1196-3B77-9B71-9FE483875A84"
-        If ($Packages) {
-            Write-LogMessage -type Error -MSG "Microsoft Edge 32-bit is currently installed."
-            Write-LogMessage -type Error -MSG "Please uninstall it and run script again if you want to switch to the 64-bit version "
-            Write-LogMessage -type Error -MSG " or run the script with -Application MicrosoftEdgeX64 to configure the PSM server"
-            exit 1
-        }
-        Write-LogMessage -type Info -MSG "Checking if Microsoft Edge is installed"
+    "MicrosoftEdge(X86|X64)?" {
+        Write-Heading -String "Microsoft Edge"
+        Write-LogMessage -type Verbose -MSG "Checking if Microsoft Edge is installed"
         If (Test-Path "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe") {
-            Write-LogMessage -type Info -MSG "Microsoft Edge appears to be installed already. Will not reinstall."
+            Write-LogMessage -type Verbose -MSG "Found Microsoft Edge at C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe."
         }
         else {
-            Write-LogMessage -type Info -MSG "Downloading and installing Microsoft Edge 64 bit"
-            $DownloadUrl = "http://go.microsoft.com/fwlink/?LinkID=2093437"
-            $OutFile = "$env:temp\MicrosoftEdgeStandaloneEnterprise64.msi"
-            Write-LogMessage -type Info -MSG "Downloading and installing Microsoft Edge"
-            $null = Install-Chromium -Type "Microsoft Edge" -DownloadUrl $DownloadUrl -OutFile $OutFile
+            Write-Error "Microsoft Edge is not present on the system. Please install that first."
+            exit 1
         }
         $WebAppSupport = Test-PSMWebAppSupport -psmRootInstallLocation $PSMInstallationFolder
         If ($WebAppSupport) {
@@ -1274,49 +1265,12 @@ switch ($Application) {
             Enable-PSMWebAppSupport -psmRootInstallLocation $PSMInstallationFolder -BackupFile $BackupHardeningXmlFilePath
             $RunHardening = $true
         }
-        $Path = "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
+        $BrowserPath = "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
+        $DriverPath = "$PSMComponentsDirectory\msedgedriver.exe"
 
         $AppLockerEntries = @(
-            (New-PSMApplicationElement -Xml $xml -EntryType Application -Name MicrosoftEdge -FileType Exe -Path $Path -Method Publisher)
-        )
-        Add-PSMConfigureAppLockerSection -SectionName "Microsoft Edge" -XmlDoc ([REF]$xml) -AppLockerEntries $AppLockerEntries
-        $AppLockerUpdated = $true
-    }
-
-    # Microsoft Edge 32 bit
-    "MicrosoftEdgeX86" {
-        Write-LogMessage -type Info -MSG "Checking if Microsoft Edge 64 bit is present"
-        $Packages = Get-Package | Where-Object TagId -eq "DF6DD533-D7E9-3ECF-892D-62A737C8619D"
-        If ($Packages) {
-            Write-LogMessage -type Error -MSG "Microsoft Edge 64-bit is currently installed."
-            Write-LogMessage -type Error -MSG "Please uninstall it and run script again if you want to switch to the 64-bit version "
-            Write-LogMessage -type Error -MSG " or run the script with -Application MicrosoftEdgeX86 to configure the PSM server"
-            exit 1
-        }
-        Write-LogMessage -type Info -MSG "Checking if Microsoft Edge is installed"
-        If (Test-Path "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe") {
-            Write-LogMessage -type Info -MSG "Microsoft Edge appears to be installed already. Will not reinstall."
-        }
-        else {
-            Write-LogMessage -type Info -MSG "Downloading and installing Microsoft Edge 32 bit"
-            $DownloadUrl = "http://go.microsoft.com/fwlink/?LinkID=2093505"
-            $OutFile = "$env:temp\MicrosoftEdgeStandaloneEnterprise86.msi"
-            Write-LogMessage -type Info -MSG "Downloading and installing Microsoft Edge"
-            $null = Install-Chromium -Type "Microsoft Edge" -DownloadUrl $DownloadUrl -OutFile $OutFile
-        }
-        $WebAppSupport = Test-PSMWebAppSupport -psmRootInstallLocation $PSMInstallationFolder
-        If ($WebAppSupport) {
-            Write-LogMessage -type Verbose -MSG "Web app support already enabled. Not modifying PSMHardening.ps1"
-        }
-        else {
-            Write-LogMessage -type Info "Enabling web app support in PSMHardening script"
-            Enable-PSMWebAppSupport -psmRootInstallLocation $PSMInstallationFolder -BackupFile $BackupHardeningXmlFilePath
-            $RunHardening = $true
-        }
-        $Path = "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
-
-        $AppLockerEntries = @(
-                (New-PSMApplicationElement -Xml $xml -EntryType Application -Name MicrosoftEdge -FileType Exe -Path $Path -Method Publisher)
+            (New-PSMApplicationElement -Xml $xml -EntryType Application -Name MicrosoftEdge -FileType Exe -Path $BrowserPath -Method Publisher),
+            (New-PSMApplicationElement -Xml $xml -EntryType Application -Name MicrosoftEdgeDriver -FileType Exe -Path $DriverPath -Method Hash)
         )
         Add-PSMConfigureAppLockerSection -SectionName "Microsoft Edge" -XmlDoc ([REF]$xml) -AppLockerEntries $AppLockerEntries
         $AppLockerUpdated = $true
